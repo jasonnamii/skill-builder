@@ -1,18 +1,13 @@
 ---
 name: skill-builder
-description: "스킬 생성·수정·패키징 유일한 게이트키퍼. 스킬 파일을 수정·제작하려면 반드시 이 스킬을 먼저 발동해야 함. 스킬빌더 없이 직접 스킬 수정 시도 = FAIL. 트리거 설계부터 Lean 작성, 검증, .skill 패키징까지 전 과정 수행. 스킬 만들기·수정·패키징·검증 요청시 발동."
-"@uses":
-  - references/trigger-guide.md
+description: |
+  스킬 생성·수정·패키징 유일한 게이트키퍼. 스킬 파일을 수정·제작하려면 반드시 이 스킬을 먼저 발동해야 함. 스킬빌더 없이 직접 스킬 수정 시도 = FAIL. 트리거 설계부터 Lean 작성, 검증, .skill 패키징까지 전 과정 수행. 스킬 만들기·수정·패키징·검증 요청시 발동.
+  P1: 스킬, skill, SKILL.md, 패키징, 검증, 스킬만들기, 스킬수정.
+  P2: 만들어줘, 수정해줘, 고쳐줘, validate, create, fix.
+  P3: skill creation, skill modification, description optimization.
+  P5: .skill로.
+  NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 스킬최적화루프(→autoloop), 다른 스킬 단순 사용(→해당 스킬).
 ---
-
-<!-- Triggers
-P1: 스킬, skill, SKILL.md, 패키징, 검증, 스킬만들기, 스킬수정.
-P2: 만들어줘, 수정해줘, 고쳐줘, validate, create, fix.
-P3: skill creation, skill modification, description optimization.
-P5: .skill로.
-NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 스킬최적화루프(→autoloop), 다른 스킬 단순 사용(→해당 스킬).
-GATE: 스킬 파일 수정·제작에만 발동. 스킬 사용 ≠ 스킬 수정.
--->
 
 # Skill Builder
 
@@ -26,7 +21,7 @@ GATE: 스킬 파일 수정·제작에만 발동. 스킬 사용 ≠ 스킬 수정
 |---|------|
 | 1 | **병렬 최대화** — 의존관계 없는 스킬은 **최대 4개 동시** 처리. 읽기·편집 각각을 병렬 tool call로 발행. 경미수정은 배치 모드로 1턴 일괄 |
 | 2 | **수정 완료 = .skill 패키징 제공** — 패키징 없이 "수정했습니다"는 미완료 |
-| 3 | **도구 우선순위: FS MCP > Cowork 빌트인** — FS `read_file`·`write_file`·`edit_file` 우선 사용. read-first 제약 없고 세션복사 불필요. FS 미응답 시에만 Cowork Read→Edit 폴백. `/tmp/` 사용 금지 |
+| 3 | **FS MCP 필수 — Cowork Write/Edit 사용 금지** — 스킬 파일 읽기·쓰기는 **반드시** FS `read_file`·`write_file`·`edit_file` 사용. Cowork 빌트인 Read/Write/Edit로 스킬 파일을 조작하면 = **FAIL**. 이유: Cowork 빌트인은 세션 디렉토리(`/sessions/`)에만 접근 가능하므로 플러그인 원본 경로에 직접 쓸 수 없고, 세션복사→패키징이라는 불필요한 우회가 발생. FS MCP가 deferred tool이라 ToolSearch가 필요하더라도 **반드시 ToolSearch→FS 순서를 밟아야 함**. FS 완전 불능(MCP 서버 다운 등) 시에만 Cowork 폴백 허용 + 사유 보고 |
 | 4 | **게이트키퍼** — 스킬 SKILL.md를 수정·제작할 때 **반드시 skill-builder를 먼저 발동**. skill-builder 미발동 상태에서 스킬 파일 수정 착수 = FAIL. 단, 다른 스킬이 대화에서 단순 '사용/발동'되는 것에는 관여하지 않음 — 오직 스킬 파일 편집·제작 시에만 |
 
 ---
@@ -35,7 +30,7 @@ GATE: 스킬 파일 수정·제작에만 발동. 스킬 사용 ≠ 스킬 수정
 
 | 원칙 | 구현 |
 |------|------|
-| **FS 직접 R/W** | FS `read_file`로 원본 읽기 → FS `write_file`로 수정본 직접 쓰기. **세션복사(cp) 제거** — 2단계를 1단계로 병합. 이유: Cowork Edit은 read-first 강제로 +1턴, cp는 +1턴 |
+| **FS 직접 R/W** | FS `read_file`로 원본 읽기 → FS `write_file`로 **플러그인 원본 경로에** 수정본 직접 쓰기. **세션복사(cp) 제거** — 2단계를 1단계로 병합. 이유: Cowork Edit은 read-first 강제로 +1턴, cp는 +1턴 |
 | **병렬 읽기** | N개 SKILL.md를 1턴에 N개 FS `read_file` 동시 발행 |
 | **병렬 편집** | 서로 다른 파일을 1턴에 최대 6개 동시 (FS `write_file` 또는 `edit_file`) |
 | **병렬 패키징** | N개 zip을 `&`+`wait`로 동시 |
@@ -113,13 +108,16 @@ GATE: 스킬 파일 수정·제작에만 발동. 스킬 사용 ≠ 스킬 수정
 
 ```
 # 1. 읽기: FS read_file로 원본 직접 읽기 (N개 동시 발행 가능)
-#    경로: mnt/.claude/skills/{skill}/SKILL.md
+#    경로: {PLUGIN_SKILLS_PATH}/{skill}/SKILL.md
 #
-# 2. 쓰기: FS write_file로 세션 디렉토리에 수정본 직접 쓰기
-#    경로: ./{skill}/SKILL.md
-#    ※ 세션복사(cp -r) 불필요 — write_file이 파일+디렉토리 생성
+# 2. 쓰기: FS write_file로 플러그인 원본 경로에 수정본 직접 쓰기
+#    경로: {PLUGIN_SKILLS_PATH}/{skill}/SKILL.md (읽은 곳과 동일 경로)
+#    ※ 세션복사(cp -r) 불필요 — 원본을 직접 덮어쓰기
 #    ※ 부분수정: FS edit_file 사용 가능 (read-first 제약 없음)
 #    ※ write_file 사용 시 전체 내용 포함 확인 — 부분 누락 방지
+#
+# ⚠️ 금지: Cowork Write/Edit로 /sessions/ 경로에 쓰는 것은 FAIL
+#    세션 디렉토리는 패키징 zip 작업 공간으로만 사용
 ```
 
 ### 3. description 동기 — 본문 수정이 description 범위에 영향 있으면 같은 턴에 갱신, 없으면 스킵.
@@ -210,8 +208,9 @@ skill-name/
 
 ## Gotchas
 
+- **Cowork Write/Edit로 스킬 작성 (가장 흔한 실패):** Claude는 Cowork Write/Edit이 시스템 기본 도구라 ToolSearch 없이 즉시 호출 가능하므로, FS MCP 대신 Cowork 도구로 세션 디렉토리에 쓰는 편향이 강하다. 이 패턴은 절대 규칙 3 위반 = FAIL. 반드시 ToolSearch→FS write_file 순서를 밟아라. "FS가 한 단계 더 필요하니 Cowork으로 하자"는 판단이 이 실패의 근본 원인.
 - **FS write_file 누락:** 전체 파일을 쓰므로 내용 일부 누락 주의. 수정 전 원본을 반드시 FS read로 확보한 뒤 수정본 전체를 write
-- **Cowork Edit 폴백:** FS MCP 미응답 시에만 사용. Cowork Edit은 반드시 Read 선행 필요 — 이 제약이 +1턴 병목의 원인
+- **Cowork Edit 폴백:** FS MCP 서버 완전 불능 시에만 허용. "편의상" 폴백 = FAIL
 - **볼트 직접배포:** mnt/.claude/skills/는 읽기전용. .skill 패키지→재설치만 반영됨
 - **`/tmp/` 경로:** `/tmp/` 사용 금지. 세션 디렉토리만 사용
 - **description↔본문 불일치:** description이 발동 판단 유일 입력. 본문 수정 시 반드시 동기 확인
