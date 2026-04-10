@@ -1,5 +1,7 @@
 # skill-builder
 
+> 🇰🇷 [한국어 README](./README.ko.md)
+
 **The only authorized path for creating and modifying skill files.**
 
 ## Prerequisites
