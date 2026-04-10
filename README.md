@@ -2,6 +2,11 @@
 
 **The only authorized path for creating and modifying skill files.**
 
+## Prerequisites
+
+- **Obsidian Vault** — vault paths referenced during skill packaging and deployment
+- **Claude Cowork or Claude Code** environment
+
 ## Goal
 
 skill-builder is the gatekeeper for the entire skill ecosystem. Direct modification of skill files without skill-builder is not allowed. It ensures every skill is properly designed, tested, validated, and packaged before deployment.
