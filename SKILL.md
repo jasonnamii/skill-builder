@@ -33,14 +33,14 @@ GATE: 스킬 파일 수정·제작에만 발동. 스킬 사용 ≠ 스킬 수정
 
 ## 속도 원칙 (모든 경로에 적용)
 
-| 원칙 | 구현 방법 | 이유 |
-|------|----------|------|
-| **병렬 읽기** | 대상 스킬 N개의 SKILL.md를 **1턴에 N개 Read tool call** 동시 발행 | 순차 읽기는 N턴 낭비 |
-| **병렬 복사** | `cp -r A ./ & cp -r B ./ & wait` 또는 N개 Bash call 동시 | 복사도 독립 작업 |
-| **병렬 편집** | 서로 다른 파일의 Edit을 **1턴에 최대 6개** 동시 발행 | Cowork Edit tool은 파일별 독립 |
-| **병렬 패키징** | N개 스킬의 zip을 **1개 Bash에 `&`+`wait`** 또는 N개 Bash call 동시 | 패키징도 독립 작업 |
-| **단계 합치기** | 편집+description 검사를 동일 Edit에서 처리 (별도 턴 X) | 왕복 1회 절감 |
-| **조건부 스킵** | 경미수정에서 description 미변경 시 동기 검사 스킵 | 불필요한 LLM 판단 제거 |
+| 원칙 | 구현 |
+|------|------|
+| **병렬 읽기** | N개 SKILL.md를 1턴에 N개 Read 동시 발행 |
+| **병렬 복사** | `cp -r A ./ & cp -r B ./ & wait` 또는 N개 Bash 동시 |
+| **병렬 편집** | 서로 다른 파일 Edit을 1턴에 최대 6개 동시 |
+| **병렬 패키징** | N개 zip을 `&`+`wait`로 동시 |
+| **단계 합치기** | 편집+description 검사를 동일 턴에 처리 |
+| **조건부 스킵** | description 미변경 시 동기 검사 스킵 |
 
 ---
 
@@ -57,53 +57,69 @@ GATE: 스킬 파일 수정·제작에만 발동. 스킬 사용 ≠ 스킬 수정
 
 ---
 
+## 허브스포크 판정 (신규·수정 공통)
+
+모든 경로에서 스킬 구조를 결정하거나 변경할 때 적용. **허브스포크가 맞으면 반드시 허브스포크로 만든다.**
+
+### 판정 기준
+
+| 조건 (하나라도 해당) | → 허브스포크 |
+|---------------------|-------------|
+| SKILL.md 단일 작성 시 >5KB 예상 | ✓ |
+| 독립 참조 블록(경로별 절차, 스키마, 가이드 등) 2개+ | ✓ |
+| 수정 중 발견: 단일인데 과밀(10KB 근접 또는 섹션 6개+) | ✓ 전환 |
+| 해당 없음 — SKILL.md ≤5KB, 참조 블록 1개 이하 | 단일 유지 |
+
+### 허브 작성 규칙
+
+| 항목 | 규칙 |
+|------|------|
+| 허브 역할 | 분기 로직·절대 규칙·경로 판정만. **세부 절차는 포인터로 대체** |
+| 허브 크기 | 목표 3KB, 최대 5KB |
+| 포인터 문법 | `→ references/{파일명}.md 참조` (Read로 로딩 유도) |
+| Gotchas | 허브에 유지 (즉시 참조 필요) |
+
+### 스포크 분리 기준
+
+| 스포크 대상 | 이유 |
+|------------|------|
+| 경로별 상세 절차 (코드·표·체크리스트) | 해당 경로 진입 시에만 필요 |
+| 스키마·레퍼런스 (10KB+) | 참조 시에만 로딩 |
+| 도메인 지식 (패턴 DB, 원리 목록 등) | 전체 로딩 불필요 |
+
+**토큰 효과:** 허브만 즉시 로딩 → 필요 스포크만 Read → 불필요 토큰 60-70% 절감.
+
+### 수정 중 전환 절차
+
+기존 단일 스킬을 수정하다가 허브스포크가 맞다고 판단되면:
+
+1. 분리 대상 섹션 식별 → `references/{이름}.md`로 이동
+2. 원본 위치에 포인터 삽입: `→ references/{이름}.md 참조`
+3. 허브 크기 ≤5KB 확인
+4. 스포크 파일 누락·참조 깨짐 검증
+
+---
+
 ## 배치 모드 (N개 스킬 동시 처리)
 
-여러 스킬을 수정할 때의 실행 패턴. **핵심: 같은 유형의 단계를 모아서 병렬 발행.**
-
-```
-턴1: Read(A) + Read(B) + Read(C) + Read(D)     ← 병렬 읽기 (최대 4개)
-턴2: Bash(cp A & cp B & cp C & cp D & wait)     ← 병렬 복사 (1 Bash)
-턴3: Edit(A) + Edit(B) + Edit(C) + Edit(D)      ← 병렬 편집 (최대 6개)
-턴4: Bash(zip A & zip B & zip C & zip D & wait)  ← 병렬 패키징 (1 Bash)
-     + cp *.skill mnt/outputs/
-턴5: 링크 제공
-```
-
-**배치 적용 조건:** 2개 이상 스킬이 같은 경로(경미/중간)일 때. 경로가 다르면 같은 경로끼리 묶어 배치.
+같은 유형의 단계를 모아서 병렬 발행: `Read(A)+Read(B)` → `cp A & cp B & wait` → `Edit(A)+Edit(B)` → `zip A & zip B & wait` → 링크.
+2개+ 스킬이 같은 경로일 때 적용. 경로가 다르면 같은 경로끼리 묶어 배치.
 
 ---
 
 ## 수정 경로 (경미 + 중간 공통)
 
-### 1. 읽기 (병렬)
+### 1. 읽기 → 2. 세션 복사 → 3. 편집
 
 ```bash
-# 여러 스킬이면 Read tool을 N개 동시 발행
-# 단일이면 1개
-cat /sessions/*/mnt/.claude/skills/{skill-name}/SKILL.md
+# 읽기: Read tool N개 동시 발행
+# 복사: cp -r mnt/.claude/skills/{skill} ./{skill}/ && chmod -R u+w ./{skill}/
+# 편집: Edit tool로 수정 (여러 파일 1턴에 동시 발행)
 ```
 
-### 2. 세션 복사 + 편집
+### 4. description 동기 — 본문 수정이 description 범위에 영향 있으면 같은 턴에 갱신, 없으면 스킵.
 
-```bash
-# 세션 루트로 복사 — 여러 스킬이면 & 로 병렬
-cp -r mnt/.claude/skills/{skill-A} ./{skill-A}/ &
-cp -r mnt/.claude/skills/{skill-B} ./{skill-B}/ &
-wait
-chmod -R u+w ./{skill-A}/ ./{skill-B}/
-```
-
-Edit tool로 수정. **동시에 여러 파일의 Edit을 1턴에 발행** (파일별 독립이므로 안전).
-
-### 3. description 동기 검사 (조건부)
-
-| 조건 | 행동 |
-|------|------|
-| 본문 수정이 description 범위(기능·수치·적용범위)에 영향 없음 | **스킵** — 편집 턴에서 판단 완료 |
-| 본문 수정이 description에 영향 있음 | 편집과 **같은 턴**에 description도 Edit으로 갱신 |
-
-### 4. 검증 체크리스트 (중간수정 + 신규만)
+### 5. 검증 체크리스트 (중간수정 + 신규만)
 
 LLM이 직접 확인. 하나라도 실패 → 수정:
 
@@ -120,20 +136,11 @@ LLM이 직접 확인. 하나라도 실패 → 수정:
 python -m scripts.quick_validate {skill-directory}
 ```
 
-### 5. 패키징 + 제공 (병렬)
+### 6. 패키징 + 제공
 
 ```bash
-# 여러 스킬이면 병렬 zip
-cd /sessions/quirky-fervent-goldberg
-zip -r {skill-A}.skill {skill-A}/ -x "*.pyc" -x "__pycache__/*" -x ".DS_Store" -x ".git/*" -x "*-workspace/*" -x "evals/*" &
-zip -r {skill-B}.skill {skill-B}/ -x "*.pyc" -x "__pycache__/*" -x ".DS_Store" -x ".git/*" -x "*-workspace/*" -x "evals/*" &
-wait
-
-# 구조 검증 + 배포 (한 번에)
-for f in {skill-A}.skill {skill-B}.skill; do
-  unzip -l "$f" | head -5
-  cp "$f" mnt/outputs/
-done
+zip -r {skill}.skill {skill}/ -x "*.pyc" -x "__pycache__/*" -x ".DS_Store" -x ".git/*" -x "*-workspace/*" -x "evals/*"
+unzip -l {skill}.skill | head -5 && cp {skill}.skill mnt/outputs/
 ```
 
 computer:// 링크로 제공. 파일명 = `{skill-name}.skill` 고정. 버전명·접미사 금지.
@@ -188,7 +195,7 @@ skill-name/
 | 코드 최소 | 패턴만, 20줄 이내 |
 | 중복 제거 | 같은 내용 1회만 |
 
-**허브+스포크 패턴:** 복잡한 스킬은 SKILL.md를 허브로 두고 세부내용을 references/로 분리.
+**허브스포크 판정:** 위 「허브스포크 판정」 섹션 기준으로 판정 → 해당 시 허브+스포크 구조로 작성. 허브(분기·규칙·포인터)는 ≤5KB, 세부내용은 `references/`로 분리.
 
 **작성 규칙:** "왜" 설명 필수(이유 없는 지시→무시), 예시 1개+(없으면 출력 자의적), Gotchas 섹션 필수, ALWAYS/NEVER 남발 대신 이유 설명.
 
@@ -198,13 +205,12 @@ skill-name/
 
 ## Gotchas
 
-- **볼트 직접배포 함정:** Cowork의 mnt/.claude/skills/는 읽기전용 마운트. 볼트에 SKILL.md를 복사해도 런타임에 반영 안 됨. 유일한 경로는 .skill 패키지 빌드→Cowork에 재설치.
-- **`/tmp/` 경로 함정:** Read/Edit tool은 세션 디렉토리 내에서만 안정 동작. `/tmp/`에 복사하면 Edit 실패 → Bash sed 우회 → 경로 혼선 → 재작업 루프. 세션 디렉토리에서만 작업.
-- **description ↔ 본문 불일치:** 본문을 수정하면서 frontmatter description을 안 바꾸는 패턴. description이 발동 판단의 유일한 입력이므로, 불일치 시 발동 오류.
-- **볼트 경로 탐색 루프:** DC start_search로 .claude/skills/ 경로를 찾으려 시도 → 히든 폴더 접근 거부 → 재탐색 → 시간 낭비. 읽기는 Cowork 마운트, 쓰기는 세션 카피. 탐색 자체를 시도하지 않는다.
-- **zip이 아닌 tar.gz:** .skill은 zip이어야 한다. `tar -czf`로 만들면 "invalid zip" 에러.
-- **순차 처리 함정:** 스킬 A 패키징 완료까지 기다린 후 스킬 B 읽기 시작하는 패턴. 독립 스킬은 반드시 병렬 tool call로 동시 처리. 순차로 빠지면 턴 수가 N배로 늘어난다.
-- **단일 Edit 턴 함정:** 1턴에 Edit 1개만 발행하는 패턴. Cowork은 1턴에 최대 6개 Edit을 병렬 지원. 서로 다른 파일이면 무조건 묶어 발행.
-- **오발동 함정:** 다른 스킬이 '사용'될 때 skill-builder까지 발동하는 패턴. "분석해줘"=사용(무관), "수정해줘"=수정(발동). 스킬 사용 ≠ 스킬 수정.
-- **SKILL.md 2개 함정:** 세션에 이전 작업 폴더(skill-builder-v2/ 등)가 남은 채 zip하면 SKILL.md가 2개 들어가 설치 실패. zip 전 `find skill-name/ -name "SKILL.md" | wc -l`로 반드시 1개 확인.
-- (초기 — 실수 발견 시 이 섹션에 직접 추가)
+- **볼트 직접배포:** mnt/.claude/skills/는 읽기전용. .skill 패키지→재설치만 반영됨
+- **`/tmp/` 경로:** Read/Edit은 세션 디렉토리만 안정. `/tmp/` 사용 금지
+- **description↔본문 불일치:** description이 발동 판단 유일 입력. 본문 수정 시 반드시 동기 확인
+- **볼트 탐색 루프:** DC start_search로 히든폴더 접근 시도 금지. 읽기=Cowork 마운트, 쓰기=세션 카피
+- **zip만:** .skill은 zip. `tar -czf` 사용 시 설치 실패
+- **순차 처리:** 독립 스킬은 반드시 병렬 tool call. 순차→턴 N배 낭비
+- **단일 Edit:** 1턴에 Edit 최대 6개 병렬 가능. 다른 파일이면 묶어 발행
+- **오발동:** 스킬 '사용'≠스킬 '수정'. "분석해줘"=무관, "수정해줘"=발동
+- **SKILL.md 2개:** zip 전 `find skill-name/ -name "SKILL.md" | wc -l`로 1개 확인
