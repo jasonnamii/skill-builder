@@ -151,11 +151,20 @@ python -m scripts.quick_validate {skill-directory}
 ### 5. 패키징 + 제공
 
 ```bash
-zip -r {skill}.skill {skill}/ -x "*.pyc" -x "__pycache__/*" -x ".DS_Store" -x ".git/*" -x "*-workspace/*" -x "evals/*"
-unzip -l {skill}.skill | head -5 && cp {skill}.skill mnt/outputs/
+# ❶ 세션 로컬에 zip 생성 (충돌 불가)
+cd /sessions/{session-id}/mnt/.claude/skills
+zip -r /sessions/{session-id}/{skill-name}.skill {skill-name}/ \
+  -x "*.pyc" -x "__pycache__/*" -x ".DS_Store" -x ".git/*" -x "*-workspace/*" -x "evals/*"
+# ❷ present_files로 제공 (자동으로 outputs 복사됨)
+mcp__cowork__present_files([{"file_path": "/sessions/{session-id}/{skill-name}.skill"}])
 ```
 
-computer:// 링크로 제공. 파일명 = `{skill-name}.skill` 고정. 버전명·접미사 금지.
+**규칙:**
+- zip은 **세션 로컬**(`/sessions/{session-id}/`)에 생성. mnt/outputs에 직접 생성 금지 (기존 파일 덮어쓰기 실패→뢐뢒이 근본 원인)
+- **present_files 필수** — 사용자에게 설치 버튼이 노출됨
+- 파일명 = `{skill-name}.skill` 고정. 버전명·접미사 금지
+- **세션 로컬 기존 .skill 선제거** — zip 생성 전 `rm -f /sessions/{session-id}/{skill-name}.skill` 실행. 기존 파일이 남아있으면 zip이 손상된 파일로 인식하여 실패함
+- **재패키징 시 기존 파일 선제거 필수** — 같은 세션에서 동일 스킬을 2회+ 패키징하면 present_files가 `-1`, `-2` 접미사를 붙임 (네이밍 오염). 재패키징 전에 형에게 "outputs에 기존 {name}.skill이 있습니다. 삭제 후 재패키징할까요?" 확인 → allow_cowork_file_delete로 삭제 → 패키징. 확인 없이 진행 금지
 
 ### 6. git-sync 연동 (패키징 직후)
 
