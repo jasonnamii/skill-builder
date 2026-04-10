@@ -24,9 +24,9 @@ GATE: 스킬 파일 수정·제작에만 발동. 스킬 사용 ≠ 스킬 수정
 
 | # | 규칙 |
 |---|------|
-| 1 | **병렬 최대화** — 의존관계 없는 스킬은 **최대 4개 동시** 처리. 읽기·복사·편집 각각을 병렬 tool call로 발행. 경미수정은 배치 모드로 1턴 일괄 |
+| 1 | **병렬 최대화** — 의존관계 없는 스킬은 **최대 4개 동시** 처리. 읽기·편집 각각을 병렬 tool call로 발행. 경미수정은 배치 모드로 1턴 일괄 |
 | 2 | **수정 완료 = .skill 패키징 제공** — 패키징 없이 "수정했습니다"는 미완료 |
-| 3 | **경로는 세션 디렉토리만** — `/tmp/` 사용 금지. Read/Edit tool이 접근 못 해서 뺑뺑이의 원인 |
+| 3 | **도구 우선순위: FS MCP > Cowork 빌트인** — FS `read_file`·`write_file`·`edit_file` 우선 사용. read-first 제약 없고 세션복사 불필요. FS 미응답 시에만 Cowork Read→Edit 폴백. `/tmp/` 사용 금지 |
 | 4 | **게이트키퍼** — 스킬 SKILL.md를 수정·제작할 때 **반드시 skill-builder를 먼저 발동**. skill-builder 미발동 상태에서 스킬 파일 수정 착수 = FAIL. 단, 다른 스킬이 대화에서 단순 '사용/발동'되는 것에는 관여하지 않음 — 오직 스킬 파일 편집·제작 시에만 |
 
 ---
@@ -35,9 +35,9 @@ GATE: 스킬 파일 수정·제작에만 발동. 스킬 사용 ≠ 스킬 수정
 
 | 원칙 | 구현 |
 |------|------|
-| **병렬 읽기** | N개 SKILL.md를 1턴에 N개 Read 동시 발행 |
-| **병렬 복사** | `cp -r A ./ & cp -r B ./ & wait` 또는 N개 Bash 동시 |
-| **병렬 편집** | 서로 다른 파일 Edit을 1턴에 최대 6개 동시 |
+| **FS 직접 R/W** | FS `read_file`로 원본 읽기 → FS `write_file`로 수정본 직접 쓰기. **세션복사(cp) 제거** — 2단계를 1단계로 병합. 이유: Cowork Edit은 read-first 강제로 +1턴, cp는 +1턴 |
+| **병렬 읽기** | N개 SKILL.md를 1턴에 N개 FS `read_file` 동시 발행 |
+| **병렬 편집** | 서로 다른 파일을 1턴에 최대 6개 동시 (FS `write_file` 또는 `edit_file`) |
 | **병렬 패키징** | N개 zip을 `&`+`wait`로 동시 |
 | **단계 합치기** | 편집+description 검사를 동일 턴에 처리 |
 | **조건부 스킵** | description 미변경 시 동기 검사 스킵 |
@@ -48,10 +48,10 @@ GATE: 스킬 파일 수정·제작에만 발동. 스킬 사용 ≠ 스킬 수정
 
 | 경로 | 조건 | 실행 단계 | 스킵 |
 |------|------|----------|------|
-| **경미수정 FAST** | 지시 1-3줄, 섹션 구조 동일, description 변경 불필요 | 읽기→편집→패키징→제공 **(3턴)** | description 검사, 검증, 테스트 |
-| **경미수정** | 지시 1-3줄, 섹션 구조 동일, description 변경 필요 | 읽기→편집+description 갱신→패키징→제공 **(3턴)** | 검증, 테스트 |
-| **중간수정** | 섹션 신설·삭제·재배치, 레퍼런스 추가, 로직 변경 | 읽기→편집+description 갱신→검증→패키징→제공 | 테스트 |
-| **신규생성** | 스킬을 처음부터 만듦 | 설계(의도→트리거→작성)→검증→패키징→제공 | 테스트 (사용자 명시 시만) |
+| **경미수정 FAST** | 지시 1-3줄, 섹션 구조 동일, description 변경 불필요 | FS read→FS write→패키징+제공 **(2턴)** | description 검사, 검증, 테스트 |
+| **경미수정** | 지시 1-3줄, 섹션 구조 동일, description 변경 필요 | FS read→FS write(+description)→패키징+제공 **(2턴)** | 검증, 테스트 |
+| **중간수정** | 섹션 신설·삭제·재배치, 레퍼런스 추가, 로직 변경 | FS read→FS write(+description)→검증→패키징+제공 **(3턴)** | 테스트 |
+| **신규생성** | 스킬을 처음부터 만듦 | 설계(의도→트리거→작성)→검증→패키징+제공 | 테스트 (사용자 명시 시만) |
 
 **판정:** 수정 개소 3 이하 + 섹션 동일 = 경미. 그 외 = 중간. 새 스킬 = 신규.
 
@@ -102,24 +102,29 @@ GATE: 스킬 파일 수정·제작에만 발동. 스킬 사용 ≠ 스킬 수정
 
 ## 배치 모드 (N개 스킬 동시 처리)
 
-같은 유형의 단계를 모아서 병렬 발행: `Read(A)+Read(B)` → `cp A & cp B & wait` → `Edit(A)+Edit(B)` → `zip A & zip B & wait` → 링크.
+같은 유형의 단계를 모아서 병렬 발행: `FS read(A)+FS read(B)` → `FS write(A)+FS write(B)` → `zip A & zip B & wait` → 링크.
 2개+ 스킬이 같은 경로일 때 적용. 경로가 다르면 같은 경로끼리 묶어 배치.
 
 ---
 
 ## 수정 경로 (경미 + 중간 공통)
 
-### 1. 읽기 → 2. 세션 복사 → 3. 편집
+### 1. FS read → 2. FS write (세션복사 제거)
 
-```bash
-# 읽기: Read tool N개 동시 발행
-# 복사: cp -r mnt/.claude/skills/{skill} ./{skill}/ && chmod -R u+w ./{skill}/
-# 편집: Edit tool로 수정 (여러 파일 1턴에 동시 발행)
+```
+# 1. 읽기: FS read_file로 원본 직접 읽기 (N개 동시 발행 가능)
+#    경로: mnt/.claude/skills/{skill}/SKILL.md
+#
+# 2. 쓰기: FS write_file로 세션 디렉토리에 수정본 직접 쓰기
+#    경로: ./{skill}/SKILL.md
+#    ※ 세션복사(cp -r) 불필요 — write_file이 파일+디렉토리 생성
+#    ※ 부분수정: FS edit_file 사용 가능 (read-first 제약 없음)
+#    ※ write_file 사용 시 전체 내용 포함 확인 — 부분 누락 방지
 ```
 
-### 4. description 동기 — 본문 수정이 description 범위에 영향 있으면 같은 턴에 갱신, 없으면 스킵.
+### 3. description 동기 — 본문 수정이 description 범위에 영향 있으면 같은 턴에 갱신, 없으면 스킵.
 
-### 5. 검증 체크리스트 (중간수정 + 신규만)
+### 4. 검증 체크리스트 (중간수정 + 신규만)
 
 LLM이 직접 확인. 하나라도 실패 → 수정:
 
@@ -136,7 +141,7 @@ LLM이 직접 확인. 하나라도 실패 → 수정:
 python -m scripts.quick_validate {skill-directory}
 ```
 
-### 6. 패키징 + 제공
+### 5. 패키징 + 제공
 
 ```bash
 zip -r {skill}.skill {skill}/ -x "*.pyc" -x "__pycache__/*" -x ".DS_Store" -x ".git/*" -x "*-workspace/*" -x "evals/*"
@@ -160,9 +165,6 @@ computer:// 링크로 제공. 파일명 = `{skill-name}.skill` 고정. 버전명
 #### 트리거 설계
 
 `references/trigger-guide.md`를 읽고 P1-P5+NOT 체계를 적용.
-
-<!-- 🥚 스킬을 만드는 스킬을 만드는 스킬을 만들다가 재귀에 빠졌다. — N.C. -->
-
 
 | 티어 | 역할 | 최소 요건 |
 |------|------|----------|
@@ -208,12 +210,12 @@ skill-name/
 
 ## Gotchas
 
+- **FS write_file 누락:** 전체 파일을 쓰므로 내용 일부 누락 주의. 수정 전 원본을 반드시 FS read로 확보한 뒤 수정본 전체를 write
+- **Cowork Edit 폴백:** FS MCP 미응답 시에만 사용. Cowork Edit은 반드시 Read 선행 필요 — 이 제약이 +1턴 병목의 원인
 - **볼트 직접배포:** mnt/.claude/skills/는 읽기전용. .skill 패키지→재설치만 반영됨
-- **`/tmp/` 경로:** Read/Edit은 세션 디렉토리만 안정. `/tmp/` 사용 금지
+- **`/tmp/` 경로:** `/tmp/` 사용 금지. 세션 디렉토리만 사용
 - **description↔본문 불일치:** description이 발동 판단 유일 입력. 본문 수정 시 반드시 동기 확인
-- **볼트 탐색 루프:** DC start_search로 히든폴더 접근 시도 금지. 읽기=Cowork 마운트, 쓰기=세션 카피
 - **zip만:** .skill은 zip. `tar -czf` 사용 시 설치 실패
 - **순차 처리:** 독립 스킬은 반드시 병렬 tool call. 순차→턴 N배 낭비
-- **단일 Edit:** 1턴에 Edit 최대 6개 병렬 가능. 다른 파일이면 묶어 발행
 - **오발동:** 스킬 '사용'≠스킬 '수정'. "분석해줘"=무관, "수정해줘"=발동
 - **SKILL.md 2개:** zip 전 `find skill-name/ -name "SKILL.md" | wc -l`로 1개 확인
