@@ -30,7 +30,7 @@ description: |
 ## 실행 흐름 — 선형 3단계
 
 ```
-① 읽기+판정 → ② 편집+검증+성능게이트 → ③ 패키징+제공
+① 읽기+판정 → ② 편집 → ②-b 검증+성능게이트 → ③ 패키징+제공
 ```
 
 ### ① 읽기 + 경로 판정
@@ -51,24 +51,29 @@ description: |
 
 | 경로 | 할 일 | 도구 |
 |------|-------|------|
-| 경미 | 해당 부분만 수정. description 변경 필요 시 같은 턴에 갱신 | Edit |
-| 중간 | 구조 변경 + description 갱신 + 검증 + 성능게이트 | Edit 또는 Write |
-| 신규 | 의도→트리거→SKILL.md 작성 + 검증 + 성능게이트 | Write |
+| 경미 | 해당 부분만 수정. description 변경 필요 시 같은 턴에 갱신. **검증: validate.py만. 성능 게이트: 스킵** | Edit |
+| 중간 | 구조 변경 + description 갱신 → ②-b 검증+성능게이트 | Edit 또는 Write |
+| 신규 | 의도→트리거→SKILL.md 작성 → ②-b 검증+성능게이트 | Write |
 
 **Edit vs Write:** 부분 수정 = Edit. 전면 재작성/신규 = Write.
 
-**검증 (중간+신규, 코드 자동화):**
+### ②-b 검증 + 성능 게이트 (중간+신규)
+
+편집 완료 후, 패키징 전에 반드시 통과.
+
+**검증 (코드 자동화):**
 ```bash
 python scripts/validate.py ./{skill}/
 # errors=[] → 통과. errors 있으면 수정 후 1회 재실행.
 # 2회차 실패 → STOP + 보고
 ```
 
-**성능 게이트 (중간+신규):** `→ references/perf-checklist.md 참조`
+**성능 게이트:** `→ references/perf-checklist.md 참조`
+**속도 저하 원인 + 트레이드오프 금지선:** `→ references/perf-checklist.md §실행 속도 저하 7대 원인 / §속도 vs 품질 트레이드오프 금지선 참조`
 
 | # | 체크 | 자동화 |
 |---|------|--------|
-| 1 | 허브스포크 적극 활용 | validate.py → `hub_spoke` 필드 |
+| 1 | 허브스포크 (허브=분기·규칙·포인터만, 스포크=세부를 references/로 분리) | validate.py → `hub_spoke` 필드 |
 | 2 | 불필요 로딩 방지 | @uses vs 본문 `→ references/` 포인터 비교 |
 | 3 | 코드 대체 가능성 | validate.py → `automatable_sections` |
 | 4 | 토큰 예산 | validate.py → `combined_tokens_estimate` (>30K 경고) |
