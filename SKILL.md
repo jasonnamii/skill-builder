@@ -21,8 +21,10 @@ description: |
 |---|------|
 | 1 | **병렬 최대화** — 의존관계 없는 스킬은 **최대 4개 동시** 처리. 읽기·편집 각각을 병렬 tool call로 발행. 경미수정은 배치 모드로 1턴 일괄 |
 | 2 | **수정 완료 = .skill 패키징 제공** — 패키징 없이 "수정했습니다"는 미완료 |
-| 3 | **FS MCP 필수 — Cowork Write/Edit 사용 금지** — 스킬 파일 읽기·쓰기는 **반드시** FS `read_file`·`write_file`·`edit_file` 사용. Cowork 빌트인 Read/Write/Edit로 스킬 파일을 조작하면 = **FAIL**. 이유: Cowork 빌트인은 세션 디렉토리(`/sessions/`)에만 접근 가능하므로 플러그인 원본 경로에 직접 쓸 수 없고, 세션복사→패키징이라는 불필요한 우회가 발생. FS MCP가 deferred tool이라 ToolSearch가 필요하더라도 **반드시 ToolSearch→FS 순서를 밟아야 함**. FS 완전 불능(MCP 서버 다운 등) 시에만 Cowork 폴백 허용 + 사유 보고 |
-| 4 | **게이트키퍼** — 스킬 SKILL.md를 수정·제작할 때 **반드시 skill-builder를 먼저 발동**. skill-builder 미발동 상태에서 스킬 파일 수정 착수 = FAIL. 단, 다른 스킬이 대화에서 단순 '사용/발동'되는 것에는 관여하지 않음 — 오직 스킬 파일 편집·제작 시에만 |
+| 3 | **FS MCP 필수 — Cowork Write/Edit 사용 금지** — 스킬 파일 읽기·쓰기는 **반드시** FS `read_file`·`write_file`·`edit_file` 사용. Cowork 빌트인 Read/Write/Edit로 스킬 파일을 조작하면 = **FAIL**. FS MCP가 deferred tool이라 ToolSearch가 필요하더라도 **반드시 ToolSearch→FS 순서를 밟아야 함**. FS 완전 불능(MCP 서버 다운 등) 시에만 Cowork 폴백 허용 + 사유 보고 |
+| 4 | **게이트키퍼** — 스킬 SKILL.md를 수정·제작할 때 **반드시 skill-builder를 먼저 발동**. skill-builder 미발동 상태에서 스킬 파일 수정 착수 = FAIL |
+| 5 | **edit_file 우선** — 부분수정은 **반드시 FS `edit_file`** 사용. `write_file`(전체 덮어쓰기)은 신규생성 또는 전면 재작성 시에만 허용. 이유: write_file은 frontmatter·references 등 수정 대상 외 부분을 누락시키는 사고의 근본 원인. edit_file은 변경 부분만 교체하므로 나머지가 보존됨 |
+| 6 | **POST_VERIFY 필수 (모든 경로)** — 쓰기 완료 후 **반드시** FS `read_file`로 첫 5줄 확인(frontmatter `---` 존재) + 원본 대비 파일/디렉토리 목록 보존 확인. 경미수정이라도 스킵 불가. 이유: 검증 없는 수정이 frontmatter 소실·파일 소실의 근본 원인 |
 
 ---
 
@@ -43,9 +45,9 @@ description: |
 
 | 경로 | 조건 | 실행 단계 | 스킵 |
 |------|------|----------|------|
-| **경미수정 FAST** | 지시 1-3줄, 섹션 구조 동일, description 변경 불필요 | FS read→FS write→패키징+제공 **(2턴)** | description 검사, 검증, 테스트 |
-| **경미수정** | 지시 1-3줄, 섹션 구조 동일, description 변경 필요 | FS read→FS write(+description)→패키징+제공 **(2턴)** | 검증, 테스트 |
-| **중간수정** | 섹션 신설·삭제·재배치, 레퍼런스 추가, 로직 변경 | FS read→FS write(+description)→검증→패키징+제공 **(3턴)** | 테스트 |
+| **경미수정 FAST** | 지시 1-3줄, 섹션 구조 동일, description 변경 불필요 | FS read→FS **edit_file**→POST_VERIFY→패키징+제공 | description 검사, 풀검증, 테스트 |
+| **경미수정** | 지시 1-3줄, 섹션 구조 동일, description 변경 필요 | FS read→FS **edit_file**(+description)→POST_VERIFY→패키징+제공 | 풀검증, 테스트 |
+| **중간수정** | 섹션 신설·삭제·재배치, 레퍼런스 추가, 로직 변경 | FS read→FS edit/write(+description)→POST_VERIFY→풀검증→패키징+제공 | 테스트 |
 | **신규생성** | 스킬을 처음부터 만듦 | 설계(의도→트리거→작성)→검증→패키징+제공 | 테스트 (사용자 명시 시만) |
 
 **판정:** 수정 개소 3 이하 + 섹션 동일 = 경미. 그 외 = 중간. 새 스킬 = 신규.
@@ -104,17 +106,24 @@ description: |
 
 ## 수정 경로 (경미 + 중간 공통)
 
-### 1. FS read → 2. FS write (세션복사 제거)
+### 1. FS read → 2. FS edit_file(부분) 또는 write_file(전면) → 3. POST_VERIFY
 
 ```
 # 1. 읽기: FS read_file로 원본 직접 읽기 (N개 동시 발행 가능)
 #    경로: {PLUGIN_SKILLS_PATH}/{skill}/SKILL.md
 #
-# 2. 쓰기: FS write_file로 플러그인 원본 경로에 수정본 직접 쓰기
-#    경로: {PLUGIN_SKILLS_PATH}/{skill}/SKILL.md (읽은 곳과 동일 경로)
-#    ※ 세션복사(cp -r) 불필요 — 원본을 직접 덮어쓰기
-#    ※ 부분수정: FS edit_file 사용 가능 (read-first 제약 없음)
-#    ※ write_file 사용 시 전체 내용 포함 확인 — 부분 누락 방지
+# 2. 쓰기 — 도구 선택 기준:
+#    부분수정(1~수개 블록 교체) → FS edit_file 필수
+#      이유: 변경 대상 외 부분(frontmatter, 다른 섹션)이 자동 보존됨
+#    전면 재작성(구조 완전 변경, 신규생성) → FS write_file 허용
+#      이유: edit_file로는 전체 구조 변경이 비효율
+#    경로: {PLUGIN_SKILLS_PATH}/{skill}/SKILL.md (읽은 곳과 동일)
+#
+# 3. POST_VERIFY (모든 경로에서 필수, 스킵 불가):
+#    ❶ FS read_file로 수정된 파일 첫 5줄 읽기 → `---` 존재 확인
+#    ❷ 원본 스킬 디렉토리의 파일 목록과 수정 후 파일 목록 비교
+#       → 의도치 않은 파일 삭제 0건 확인
+#    ❸ FAIL 시 → 즉시 복구 후 재검증
 #
 # ⚠️ 금지: Cowork Write/Edit로 /sessions/ 경로에 쓰는 것은 FAIL
 #    세션 디렉토리는 패키징 zip 작업 공간으로만 사용
@@ -122,7 +131,7 @@ description: |
 
 ### 3. description 동기 — 본문 수정이 description 범위에 영향 있으면 같은 턴에 갱신, 없으면 스킵.
 
-### 4. 검증 체크리스트 (중간수정 + 신규만)
+### 4. 풀검증 체크리스트 (중간수정 + 신규)
 
 LLM이 직접 확인. 하나라도 실패 → 수정:
 
@@ -208,9 +217,9 @@ skill-name/
 
 ## Gotchas
 
-- **Cowork Write/Edit로 스킬 작성 (가장 흔한 실패):** Claude는 Cowork Write/Edit이 시스템 기본 도구라 ToolSearch 없이 즉시 호출 가능하므로, FS MCP 대신 Cowork 도구로 세션 디렉토리에 쓰는 편향이 강하다. 이 패턴은 절대 규칙 3 위반 = FAIL. 반드시 ToolSearch→FS write_file 순서를 밟아라. "FS가 한 단계 더 필요하니 Cowork으로 하자"는 판단이 이 실패의 근본 원인.
-- **FS write_file 누락:** 전체 파일을 쓰므로 내용 일부 누락 주의. 수정 전 원본을 반드시 FS read로 확보한 뒤 수정본 전체를 write
-- **Cowork Edit 폴백:** FS MCP 서버 완전 불능 시에만 허용. "편의상" 폴백 = FAIL
+- **write_file로 부분수정 (가장 흔한 구조 파괴 원인):** 부분수정에 write_file을 쓰면 수정 대상 외 부분(frontmatter, 다른 섹션, references)을 누락시킨다. 부분수정은 반드시 edit_file. write_file은 전면 재작성 시에만. 절대 규칙 5.
+- **POST_VERIFY 스킵 (두 번째로 흔한 실패):** "경미수정이니 검증 불필요"라는 판단이 frontmatter 소실의 근본 원인. 모든 경로에서 필수. 절대 규칙 6.
+- **Cowork Write/Edit 사용:** Cowork 빌트인은 세션 디렉토리에만 접근 가능. 플러그인 원본 경로에 쓸 수 없으므로 세션복사→패키징 우회가 발생. 반드시 ToolSearch→FS. 절대 규칙 3.
 - **볼트 직접배포:** mnt/.claude/skills/는 읽기전용. .skill 패키지→재설치만 반영됨
 - **`/tmp/` 경로:** `/tmp/` 사용 금지. 세션 디렉토리만 사용
 - **description↔본문 불일치:** description이 발동 판단 유일 입력. 본문 수정 시 반드시 동기 확인
