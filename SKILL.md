@@ -1,11 +1,11 @@
 ---
 name: skill-builder
 description: |
-  스킬 생성·수정·패키징 유일한 게이트키퍼. SKILL.md를 수정하기 전 반드시 Skill tool로 발동. 스킬 진단·리팩터링·재작성·트리거설계·Lean작성·검증·성능게이트·.skill 패키징 전 과정 수행.
+  스킬 생성·수정·패키징 게이트키퍼. 진단·리팩터링·재작성·트리거설계·검증·성능게이트·.skill 패키징. autoloop handoff 지원 — handoff.json 감지 시 검증→패키징 직행.
   P1: 스킬, skill, SKILL.md, 패키징, 검증, 스킬만들기, 스킬수정, 스킬고치기, 스킬리팩터링.
   P2: 만들어줘, 수정해줘, 고쳐줘, 재작성해줘, validate, create, fix, refactor.
   P3: skill creation, skill modification, skill refactoring, description optimization.
-  P4: SKILL.md를 편집하려 할 때, 스킬 파일을 수정하려 할 때, 스킬 구조를 변경하려 할 때.
+  P4: SKILL.md 편집시, 스킬 구조 변경시, autoloop 완료 후 패키징시.
   P5: .skill로.
   NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 스킬최적화루프(→autoloop), 다른 스킬 단순 사용(→해당 스킬).
 ---
@@ -24,7 +24,7 @@ description: |
 | 2 | **수정 완료 = .skill 패키징 제공** | 사용자가 설치할 수 없음 |
 | 3 | **세션 내 직접 편집** — 원본(ORIGIN)을 세션으로 복사 → Cowork Edit/Write로 수정 → zip → present. FS MCP는 plugin_skills_path 반영 시에만 사용. **재시도 루프 금지** | 세션 도구가 가장 빠르고 경로 혼선 없음 |
 | 4 | **루프 하드캡** — 모든 재시도·검증 순회 **max 2회**. 초과 → 보고 + STOP | 무한 루프 방지 |
-| 5 | **원본 유일 = skills-plugin** — 매번 원본에서 새로 가져와야 한다. 반영은 형이 .skill 설치로 직접 수행 | 버전 꼬임 방지 |
+| 5 | **원본 유일 = skills-plugin** — 매번 원본에서 새로 가져와야 한다. 반영은 형이 .skill 설치로 직접 수행. **예외: autoloop handoff** — 세션에 `handoff.json`이 존재하면 오토루프 실험장의 최적화된 SKILL.md를 원본으로 사용 | 버전 꼬임 방지. handoff 예외는 오토루프가 이미 최신 검증을 완료했기 때문 |
 
 ---
 
@@ -39,6 +39,14 @@ description: |
 ```
 ORIGIN = skills-plugin 경로 (mnt/.claude/skills/ 로 접근)
 SESSION = /sessions/{session-id}/
+
+0. 핸드오프 감지 (최우선):
+   - 세션에 autoloop-lab/{skill-name}/handoff.json 존재?
+   - YES → 핸드오프 경로. 아래 1~3 스킵. 오토루프 실험장을 세션 작업본으로 직접 사용.
+     SESSION_SKILL = /sessions/{session-id}/autoloop-lab/{skill-name}/
+     handoff.json 읽기 → 점수·변경 요약 확인 → ②-b 검증+성능게이트 → ③ 패키징으로 직행.
+     ② 편집은 스킵 (오토루프가 이미 최적화 완료).
+   - NO → 기존 경로 (아래 1~4)
 
 1. 원본(ORIGIN)을 세션으로 복사:
    Bash: cp -r /sessions/{session-id}/mnt/.claude/skills/{skill}/ /sessions/{session-id}/{skill}/
@@ -194,3 +202,5 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 | FS MCP 집착 / 순차 처리 | 세션 도구(Read/Write/Edit/Bash) 우선. 독립 스킬은 병렬 tool call |
 | SKILL.md 2개 | zip 전 `find {skill}/ -name "SKILL.md" | wc -l`로 1개 확인 |
 | 진단→수정 전환 시 발동 누락 | "그럼 수정하자"로 넘어갈 때 **Skill tool 호출 먼저** |
+| handoff.json 있는데 skills-plugin에서 복사 | 오토루프 최적화 결과를 덮어쓴다. step 0 핸드오프 감지를 반드시 먼저 확인 |
+| handoff 경로에서 ② 편집 시도 | 오토루프가 이미 최적화 완료. 편집은 스킵하고 ②-b → ③으로 직행. 추가 수정 필요 시 형에게 확인 |
