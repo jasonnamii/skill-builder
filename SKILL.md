@@ -16,46 +16,53 @@ description: |
 
 ---
 
-## ⛔ 절대 규칙 (4개만)
+## ⛔ 절대 규칙 (5개)
 
 | # | 규칙 | 이유 |
 |---|------|------|
 | 1 | **게이트키퍼** — SKILL.md 수정·생성 전 **반드시 `Skill tool`로 skill-builder 발동**. 도구 무관. 미발동 수정 = FAIL | 진단→수정 전환 시 발동 누락이 가장 흔한 위반 |
 | 2 | **수정 완료 = .skill 패키징 제공** | 사용자가 설치할 수 없음 |
-| 3 | **Cowork Read/Edit 기본** — 세션 복사 후 편집. FS MCP 불가 시 Cowork로 진행. **재시도 루프 금지** | FS 강제가 뺑뺑이의 근본 원인 |
+| 3 | **작업대 = 볼트 `_Skills archive/`** — FS로 편집. Cowork Read/Edit는 폴백. **재시도 루프 금지** | FS로 볼트 직접 작업이 빠르고 영속적 |
 | 4 | **루프 하드캡** — 모든 재시도·검증 순회 **max 2회**. 초과 → 보고 + STOP | 무한 루프 방지 |
+| 5 | **원본 유일 = skills-plugin** — 작업대(`_Skills archive/`)는 **순수 편집 공간**. 여기서 git-sync·배포·참조·수정소스 사용 = FAIL. 매번 원본에서 새로 가져와야 한다. 반영은 형이 .skill 설치로 직접 수행 | 작업대 잔해가 원본으로 오염되면 버전 꼬임 |
 
 ---
 
 ## 실행 흐름 — 선형 3단계
 
 ```
-① 읽기+판정 → ② 편집 → ②-b 검증+성능게이트 → ③ 패키징+제공
+① 읽기+판정 → [진단이면 보고+종료] → ② 편집 → ②-b 검증+성능게이트 → ③ 패키징+제공
 ```
 
 ### ① 읽기 + 경로 판정
 
 ```
-1. cp -r mnt/.claude/skills/{skill} ./{skill}/ && chmod -R u+w ./{skill}/
-2. SKILL.md 읽기 (Read tool)
-3. python scripts/validate.py ./{skill}/  ← 현재 상태 자동 진단
+WORKBENCH = $HOME/Library/CloudStorage/Dropbox/ObsidianVault/Agent-Ops/_Skills archive/
+ORIGIN = skills-plugin 경로 (mnt/.claude/skills/ 로 접근)
+
+1. 원본(ORIGIN)에서 WORKBENCH로 FS 복사:
+   FS read_file(ORIGIN/{skill}/SKILL.md) → FS write_file(WORKBENCH/{skill}/SKILL.md)
+   ⚠ WORKBENCH에 이전 작업 잔해가 있으면 무시하고 원본으로 덮어쓴다
+2. SKILL.md 읽기 (FS read_file)
+3. python scripts/validate.py (세션에 복사 후 실행 — validate만 세션에서)
 4. 경로 판정 (1회 확정):
+   - 진단: "진단해줘/검증해줘" 요청 → validate.py 결과 보고만. ②③ 스킵, 종료. 이후 "수정하자" 시 Skill tool 재발동 필수
    - 경미: 수정 개소 ≤3, 섹션 구조 동일
    - 중간: 섹션 신설·삭제·재배치, 로직 변경
    - 신규: 처음부터 만듦
 ```
 
-**N개 동시 처리:** 독립 스킬이면 cp + Read + validate.py를 병렬 tool call로 발행.
+**N개 동시 처리:** 독립 스킬이면 FS 복사 + Read + validate.py를 병렬 tool call로 발행.
 
 ### ② 편집
 
 | 경로 | 할 일 | 도구 |
 |------|-------|------|
-| 경미 | 해당 부분만 수정. description 변경 필요 시 같은 턴에 갱신. **검증: validate.py만. 성능 게이트: 스킵** | Edit |
-| 중간 | 구조 변경 + description 갱신 → ②-b 검증+성능게이트 | Edit 또는 Write |
-| 신규 | 의도→트리거→SKILL.md 작성 → ②-b 검증+성능게이트 | Write |
+| 경미 | 해당 부분만 수정. description 변경 필요 시 같은 턴에 갱신. **검증: validate.py만. 성능 게이트: 스킵** | FS edit_file |
+| 중간 | 구조 변경 + description 갱신 → ②-b 검증+성능게이트 | FS edit_file 또는 FS write_file |
+| 신규 | 의도→트리거→SKILL.md 작성 → ②-b 검증+성능게이트 | FS write_file |
 
-**Edit vs Write:** 부분 수정 = Edit. 전면 재작성/신규 = Write.
+**편집 대상 경로:** WORKBENCH(`_Skills archive/{skill}/`). FS MCP 불가 시 Cowork Edit/Write 폴백.
 
 ### ②-b 검증 + 성능 게이트 (중간+신규)
 
@@ -63,8 +70,10 @@ description: |
 
 **검증 (코드 자동화):**
 ```bash
+# WORKBENCH에서 세션으로 복사 후 실행 (validate는 세션 샌드박스에서)
+cp -r "{WORKBENCH}/{skill}/" ./{skill}/ 2>/dev/null; chmod -R u+w ./{skill}/
 python scripts/validate.py ./{skill}/
-# errors=[] → 통과. errors 있으면 수정 후 1회 재실행.
+# errors=[] → 통과. errors 있으면 WORKBENCH 수정 후 재복사+1회 재실행.
 # 2회차 실패 → STOP + 보고
 ```
 
@@ -82,8 +91,12 @@ python scripts/validate.py ./{skill}/
 ### ③ 패키징 + 제공
 
 ```bash
+# WORKBENCH → 세션으로 최종본 복사 후 zip
+WORKBENCH="$HOME/Library/CloudStorage/Dropbox/ObsidianVault/Agent-Ops/_Skills archive"
+rm -rf /sessions/{session-id}/{skill-name}/
+cp -r "{WORKBENCH}/{skill-name}/" /sessions/{session-id}/{skill-name}/
 rm -f /sessions/{session-id}/{skill-name}.skill
-cd /sessions/{session-id}/mnt/.claude/skills
+cd /sessions/{session-id}
 zip -r /sessions/{session-id}/{skill-name}.skill {skill-name}/ \
   -x "*.pyc" -x "__pycache__/*" -x ".DS_Store" -x ".git/*" -x "*-workspace/*" -x "evals/*"
 ```
@@ -176,8 +189,9 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 
 | 함정 | 대응 |
 |------|------|
-| mnt/.claude/skills/ 직접 쓰기 | 읽기전용. 세션 복사 후 편집 → .skill 설치만 반영 |
+| mnt/.claude/skills/ 직접 쓰기 | 읽기전용. WORKBENCH로 복사 후 편집 → .skill 설치만 반영 |
 | `/tmp/` 경로 | Read/Edit 접근 불가. 세션 디렉토리만 사용 |
+| **작업대(`_Skills archive/`)에서 git-sync·배포·참조** | **FAIL. 작업대는 순수 편집 공간. 원본(skills-plugin)만이 git-sync·배포 소스. 작업대 잔해로 시작하지 말 것 — 매번 원본에서 가져와라** |
 | description↔본문 불일치 | description이 발동 판단 유일 입력. 수정 시 동기 확인 |
 | zip 대신 tar | .skill은 zip만. tar = 설치 실패 |
 | FS MCP 집착 / 순차 처리 | FS 불가 → Cowork 즉시 진행. 독립 스킬은 병렬 tool call |
