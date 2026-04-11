@@ -22,9 +22,9 @@ description: |
 |---|------|------|
 | 1 | **게이트키퍼** — SKILL.md 수정·생성 전 **반드시 `Skill tool`로 skill-builder 발동**. 도구 무관. 미발동 수정 = FAIL | 진단→수정 전환 시 발동 누락이 가장 흔한 위반 |
 | 2 | **수정 완료 = .skill 패키징 제공** | 사용자가 설치할 수 없음 |
-| 3 | **작업대 = 볼트 `_skills workspace/`** — FS로 편집. Cowork Read/Edit는 폴백. **재시도 루프 금지** | FS로 볼트 직접 작업이 빠르고 영속적 |
+| 3 | **세션 내 직접 편집** — 원본(ORIGIN)을 세션으로 복사 → Cowork Edit/Write로 수정 → zip → present. FS MCP는 plugin_skills_path 반영 시에만 사용. **재시도 루프 금지** | 세션 도구가 가장 빠르고 경로 혼선 없음 |
 | 4 | **루프 하드캡** — 모든 재시도·검증 순회 **max 2회**. 초과 → 보고 + STOP | 무한 루프 방지 |
-| 5 | **원본 유일 = skills-plugin** — 작업대(`_skills workspace/`)는 **순수 편집 공간**. 여기서 git-sync·배포·참조·수정소스 사용 = FAIL. 매번 원본에서 새로 가져와야 한다. 반영은 형이 .skill 설치로 직접 수행 | 작업대 잔해가 원본으로 오염되면 버전 꼬임 |
+| 5 | **원본 유일 = skills-plugin** — 매번 원본에서 새로 가져와야 한다. 반영은 형이 .skill 설치로 직접 수행 | 버전 꼬임 방지 |
 
 ---
 
@@ -37,14 +37,14 @@ description: |
 ### ① 읽기 + 경로 판정
 
 ```
-WORKBENCH = $HOME/Library/CloudStorage/Dropbox/ObsidianVault/Agent-Ops/_skills workspace/
 ORIGIN = skills-plugin 경로 (mnt/.claude/skills/ 로 접근)
+SESSION = /sessions/{session-id}/
 
-1. 원본(ORIGIN)에서 WORKBENCH로 FS 복사:
-   FS read_file(ORIGIN/{skill}/SKILL.md) → FS write_file(WORKBENCH/{skill}/SKILL.md)
-   ⚠ WORKBENCH에 이전 작업 잔해가 있으면 무시하고 원본으로 덮어쓴다
-2. SKILL.md 읽기 (FS read_file)
-3. python scripts/validate.py (세션에 복사 후 실행 — validate만 세션에서)
+1. 원본(ORIGIN)을 세션으로 복사:
+   Bash: cp -r /sessions/{session-id}/mnt/.claude/skills/{skill}/ /sessions/{session-id}/{skill}/
+   ⚠ references/, scripts/ 등 하위 폴더도 모두 복사
+2. SKILL.md 읽기 (Cowork Read)
+3. python scripts/validate.py (세션에서 실행)
 4. 경로 판정 (1회 확정):
    - 진단: "진단해줘/검증해줘" 요청 → validate.py 결과 보고만. ②③ 스킵, 종료. 이후 "수정하자" 시 Skill tool 재발동 필수
    - 경미: 수정 개소 ≤3, 섹션 구조 동일
@@ -52,17 +52,17 @@ ORIGIN = skills-plugin 경로 (mnt/.claude/skills/ 로 접근)
    - 신규: 처음부터 만듦
 ```
 
-**N개 동시 처리:** 독립 스킬이면 FS 복사 + Read + validate.py를 병렬 tool call로 발행.
+**N개 동시 처리:** 독립 스킬이면 복사 + Read + validate.py를 병렬 tool call로 발행.
 
 ### ② 편집
 
 | 경로 | 할 일 | 도구 |
 |------|-------|------|
-| 경미 | 해당 부분만 수정. description 변경 필요 시 같은 턴에 갱신. **검증: validate.py만. 성능 게이트: 스킵** | FS edit_file |
-| 중간 | 구조 변경 + description 갱신 → ②-b 검증+성능게이트 | FS edit_file 또는 FS write_file |
-| 신규 | 의도→트리거→SKILL.md 작성 → ②-b 검증+성능게이트 | FS write_file |
+| 경미 | 해당 부분만 수정. description 변경 필요 시 같은 턴에 갱신. **검증: validate.py만. 성능 게이트: 스킵** | Cowork Edit |
+| 중간 | 구조 변경 + description 갱신 → ②-b 검증+성능게이트 | Cowork Edit 또는 Write |
+| 신규 | 의도→트리거→SKILL.md 작성 → ②-b 검증+성능게이트 | Cowork Write |
 
-**편집 대상 경로:** WORKBENCH(`_skills workspace/{skill}/`). FS MCP 불가 시 Cowork Edit/Write 폴백.
+**편집 대상 경로:** 세션(`/sessions/{session-id}/{skill}/`). Cowork Edit/Write 사용.
 
 ### ②-b 검증 + 성능 게이트 (중간+신규)
 
@@ -70,10 +70,9 @@ ORIGIN = skills-plugin 경로 (mnt/.claude/skills/ 로 접근)
 
 **검증 (코드 자동화):**
 ```bash
-# WORKBENCH에서 세션으로 복사 후 실행 (validate는 세션 샌드박스에서)
-cp -r "{WORKBENCH}/{skill}/" ./{skill}/ 2>/dev/null; chmod -R u+w ./{skill}/
+cd /sessions/{session-id}
 python scripts/validate.py ./{skill}/
-# errors=[] → 통과. errors 있으면 WORKBENCH 수정 후 재복사+1회 재실행.
+# errors=[] → 통과. errors 있으면 수정 후 1회 재실행.
 # 2회차 실패 → STOP + 보고
 ```
 
@@ -91,18 +90,16 @@ python scripts/validate.py ./{skill}/
 ### ③ 패키징 + 제공
 
 ```bash
-# WORKBENCH → 세션으로 최종본 복사 후 zip
-WORKBENCH="$HOME/Library/CloudStorage/Dropbox/ObsidianVault/Agent-Ops/_skills workspace"
-rm -rf /sessions/{session-id}/{skill-name}/
-cp -r "{WORKBENCH}/{skill-name}/" /sessions/{session-id}/{skill-name}/
-rm -f /sessions/{session-id}/{skill-name}.skill
+# 세션에서 직접 zip (WORKBENCH 경유 없음)
 cd /sessions/{session-id}
-zip -r /sessions/{session-id}/{skill-name}.skill {skill-name}/ \
+rm -f {skill-name}.skill
+zip -r {skill-name}.skill {skill-name}/ \
   -x "*.pyc" -x "__pycache__/*" -x ".DS_Store" -x ".git/*" -x "*-workspace/*" -x "evals/*"
+cp {skill-name}.skill mnt/outputs/
 ```
 
 ```
-mcp__cowork__present_files([{"file_path": "/sessions/{session-id}/{skill-name}.skill"}])
+mcp__cowork__present_files([{"file_path": "/sessions/{session-id}/mnt/outputs/{skill-name}.skill"}])
 ```
 
 **재패키징:** outputs에 기존 .skill → 형에게 삭제 확인 → allow_cowork_file_delete → 재패키징.
@@ -189,11 +186,11 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 
 | 함정 | 대응 |
 |------|------|
-| mnt/.claude/skills/ 직접 쓰기 | 읽기전용. WORKBENCH로 복사 후 편집 → .skill 설치만 반영 |
+| mnt/.claude/skills/ 직접 쓰기 | 읽기전용. 세션으로 복사 후 편집 → .skill 설치만 반영 |
 | `/tmp/` 경로 | Read/Edit 접근 불가. 세션 디렉토리만 사용 |
-| **작업대(`_skills workspace/`)에서 git-sync·배포·참조** | **FAIL. 작업대는 순수 편집 공간. 원본(skills-plugin)만이 git-sync·배포 소스. 작업대 잔해로 시작하지 말 것 — 매번 원본에서 가져와라** |
+| **WORKBENCH(`_skills workspace/`) 경유** | **불필요. 세션에서 직접 편집 → zip이 최단 경로. WORKBENCH는 경로 이원화(FS MCP vs Cowork)로 병목 발생** |
 | description↔본문 불일치 | description이 발동 판단 유일 입력. 수정 시 동기 확인 |
 | zip 대신 tar | .skill은 zip만. tar = 설치 실패 |
-| FS MCP 집착 / 순차 처리 | FS 불가 → Cowork 즉시 진행. 독립 스킬은 병렬 tool call |
-| SKILL.md 2개 | zip 전 `find {skill}/ -name "SKILL.md" \| wc -l`로 1개 확인 |
+| FS MCP 집착 / 순차 처리 | 세션 도구(Read/Write/Edit/Bash) 우선. 독립 스킬은 병렬 tool call |
+| SKILL.md 2개 | zip 전 `find {skill}/ -name "SKILL.md" | wc -l`로 1개 확인 |
 | 진단→수정 전환 시 발동 누락 | "그럼 수정하자"로 넘어갈 때 **Skill tool 호출 먼저** |
