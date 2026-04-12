@@ -49,9 +49,9 @@ SESSION = /sessions/{session-id}/
      ② 편집은 스킵 (오토루프가 이미 최적화 완료).
    - NO → 기존 경로 (아래 1~4)
 
-1. 원본(ORIGIN)을 세션으로 복사:
-   Bash: cp -r /sessions/{session-id}/mnt/.claude/skills/{skill}/ /sessions/{session-id}/{skill}/
-   ⚠ references/, scripts/ 등 하위 폴더도 모두 복사
+1. 원본(ORIGIN)을 세션으로 복사 + 권한 부여:
+   Bash: cp -r /sessions/{session-id}/mnt/.claude/skills/{skill}/ /sessions/{session-id}/{skill}/ && chmod -R u+w /sessions/{session-id}/{skill}/
+   ⚠ references/, scripts/ 등 하위 폴더도 모두 복사. chmod 필수 — 원본이 read-only이므로 복사본도 read-only로 붙음. 미실행 시 Edit/Write EACCES 에러
 2. SKILL.md 읽기 (Cowork Read)
 3. python scripts/validate.py (세션에서 실행)
 4. 경로 판정 (1회 확정):
