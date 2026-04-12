@@ -1,11 +1,11 @@
 ---
 name: skill-builder
 description: |
-  스킬 생성·수정·패키징 게이트키퍼. 진단·리팩터링·재작성·트리거설계·검증·성능게이트·.skill 패키징. autoloop handoff 지원 — handoff.json 감지 시 검증→패키징 직행.
-  P1: 스킬, skill, SKILL.md, 패키징, 검증, 스킬만들기, 스킬수정, 스킬고치기, 스킬리팩터링.
-  P2: 만들어줘, 수정해줘, 고쳐줘, 재작성해줘, validate, create, fix, refactor.
+  스킬 생성·수정·패키징 게이트키퍼. 진단·리팩터링·재작성·트리거설계·검증·성능게이트·.skill 패키징. autoloop handoff 지원.
+  P1: 스킬, skill, SKILL.md, 패키징, 검증, 스킬만들기, 스킬수정, 스킬고치기, 스킬리팩터링, 스킬고도화.
+  P2: 만들어줘, 수정해줘, 고쳐줘, 재작성해줘, 고도화해줘, validate, create, fix, refactor.
   P3: skill creation, skill modification, skill refactoring, description optimization.
-  P4: SKILL.md 편집시, 스킬 구조 변경시, autoloop 완료 후 패키징시.
+  P4: SKILL.md 편집시, 스킬 구조 변경시, autoloop 완료 후 패키징시, EDIT4 대상=SKILL.md면 선발동 필수.
   P5: .skill로.
   NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 스킬최적화루프(→autoloop), 다른 스킬 단순 사용(→해당 스킬).
 ---
@@ -117,6 +117,7 @@ mcp__cowork__present_files([{"file_path": "/sessions/{session-id}/mnt/outputs/{s
 
 ## 허브스포크 판정
 
+**전환 절차:** `→ references/hub-spoke-guide.md 참조`
 **판정 시점:** ① 읽기 단계에서 `validate.py` 자동 판정. 전환도 1회만.
 
 | 조건 (하나라도) | 결과 |
@@ -132,9 +133,10 @@ mcp__cowork__present_files([{"file_path": "/sessions/{session-id}/mnt/outputs/{s
 
 ---
 
-## 신규생성 — 트리거 설계
+## 신규생성 — 스켈레톤 + 트리거 설계
 
-`→ references/trigger-guide.md 참조`
+`→ references/new-skill-template.md 참조` (스켈레톤)
+`→ references/trigger-guide.md 참조` (트리거)
 
 | 티어 | 역할 | 최소 |
 |------|------|------|
@@ -202,5 +204,6 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 | FS MCP 집착 / 순차 처리 | 세션 도구(Read/Write/Edit/Bash) 우선. 독립 스킬은 병렬 tool call |
 | SKILL.md 2개 | zip 전 `find {skill}/ -name "SKILL.md" | wc -l`로 1개 확인 |
 | 진단→수정 전환 시 발동 누락 | "그럼 수정하자"로 넘어갈 때 **Skill tool 호출 먼저** |
+| **EDIT4 직행으로 skill-builder 우회** | SKILL.md가 수정 대상이면 EDIT4 프로토콜 진입 전 skill-builder 발동 필수. "수정해" 요청 → EDIT4 레벨 판정 전에 파일명이 SKILL.md인지 체크 → 맞으면 skill-builder 먼저. 미발동 직접 수정 = FAIL |
 | handoff.json 있는데 skills-plugin에서 복사 | 오토루프 최적화 결과를 덮어쓴다. step 0 핸드오프 감지를 반드시 먼저 확인 |
 | handoff 경로에서 ② 편집 시도 | 오토루프가 이미 최적화 완료. 편집은 스킵하고 ②-b → ③으로 직행. 추가 수정 필요 시 형에게 확인 |

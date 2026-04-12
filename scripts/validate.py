@@ -182,6 +182,56 @@ def calculate_refs_size(skill_path):
     return total_bytes, total_tokens
 
 
+def check_reference_pointers(skill_path, content):
+    """Check that all → references/xxx.md pointers resolve to actual files."""
+    broken = []
+    pointers = re.findall(r'→\s+references/([^\s]+\.md)', content)
+    refs_dir = skill_path / 'references'
+    for ptr in pointers:
+        # Skip template placeholders like {파일명}.md
+        if re.search(r'\{.*?\}', ptr):
+            continue
+        if not (refs_dir / ptr).exists():
+            broken.append(ptr)
+    return broken
+
+
+def check_gotchas_section(content):
+    """Check that a Gotchas section exists (Lean principle: Gotchas required)."""
+    return bool(re.search(r'^#+\s*Gotchas', content, re.MULTILINE | re.IGNORECASE))
+
+
+def check_duplicate_skill_md(skill_path):
+    """Check that only one SKILL.md exists in the skill directory tree."""
+    count = len(list(skill_path.rglob('SKILL.md')))
+    return count
+
+
+def check_description_body_coherence(fm, content):
+    """
+    Check that P1 keywords in description appear somewhere in the body text.
+    Returns list of P1 keywords missing from body.
+    """
+    desc = fm.get('description', '')
+    p1_match = re.search(r'P1:\s*(.+?)(?=P2:|P3:|P5:|NOT:|$)', desc, re.DOTALL)
+    if not p1_match:
+        return []
+
+    # Extract body (everything after frontmatter)
+    body_match = re.match(r'^---\n.*?\n---\n(.*)', content, re.DOTALL)
+    body = body_match.group(1).lower() if body_match else content.lower()
+
+    items = re.split(r'[,.\n]+', p1_match.group(1).strip())
+    keywords = [x.strip().lower() for x in items if x.strip() and not x.strip().startswith('P')]
+
+    missing = []
+    for kw in keywords:
+        # Allow partial match (e.g. "스킬수정" matches if "수정" is in body)
+        if kw not in body and not any(part in body for part in kw.split() if len(part) > 1):
+            missing.append(kw)
+    return missing
+
+
 def validate_skill(skill_path):
     """Main validation function."""
     skill_path = Path(skill_path)
@@ -220,6 +270,23 @@ def validate_skill(skill_path):
     hub_spoke, _ = analyze_hub_spoke(skill_path, content)
     phases, scripts_count, automatable = analyze_performance(skill_path, content)
 
+    # New validations: pointer integrity, gotchas, duplicate SKILL.md, desc↔body coherence
+    broken_pointers = check_reference_pointers(skill_path, content)
+    if broken_pointers:
+        errors.append(f"Broken reference pointers: {', '.join(broken_pointers)}")
+
+    has_gotchas = check_gotchas_section(content)
+    if not has_gotchas:
+        warnings.append("No Gotchas section found (Lean principle: Gotchas required)")
+
+    skill_md_count = check_duplicate_skill_md(skill_path)
+    if skill_md_count > 1:
+        errors.append(f"Multiple SKILL.md files found ({skill_md_count}), must be exactly 1")
+
+    desc_body_missing = check_description_body_coherence(fm, content)
+    if desc_body_missing:
+        warnings.append(f"P1 keywords not found in body: {', '.join(desc_body_missing)}")
+
     for tier, min_val in [('P1', 5), ('P2', 2), ('P3', 2), ('P5', 1)]:
         if p_tiers[tier] < min_val:
             desc = {
@@ -234,7 +301,9 @@ def validate_skill(skill_path):
         'estimated_tokens': skill_tokens, 'description_chars': len(fm.get('description', '')),
         'refs_total_bytes': refs_bytes, 'refs_total_kb': round(refs_bytes / 1024, 1) if refs_bytes else 0,
         'combined_tokens_estimate': combined_tokens, 'p_tiers': p_tiers, 'hub_spoke': hub_spoke,
-        'phases_count': phases, 'scripts_count': scripts_count, 'automatable_sections': automatable
+        'phases_count': phases, 'scripts_count': scripts_count, 'automatable_sections': automatable,
+        'broken_ref_pointers': broken_pointers, 'has_gotchas': has_gotchas,
+        'skill_md_count': skill_md_count, 'desc_body_missing_keywords': desc_body_missing
     }
 
     return {
