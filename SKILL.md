@@ -110,6 +110,7 @@ cp {skill-name}.skill mnt/outputs/
 mcp__cowork__present_files([{"file_path": "/sessions/{session-id}/mnt/outputs/{skill-name}.skill"}])
 ```
 
+**네이밍 절대규칙:** .skill 파일명 = 원본 스킬 폴더명 **그대로**. `-1`, `-2`, `_copy` 등 접미사 절대 금지. 형이 명시적으로 네이밍 변경을 지시한 경우만 예외. zip 전 `rm -f {skill-name}.skill`로 기존 파일 선제거 → 중복 회피 접미사 원천 차단.
 **재패키징:** outputs에 기존 .skill → 형에게 삭제 확인 → allow_cowork_file_delete → 재패키징.
 **git-sync:** 패키징 완료 후 "git push 할까요?" 1줄 제안. 형 컨펌 시 git-sync 발동.
 
@@ -207,3 +208,4 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 | **EDIT4 직행으로 skill-builder 우회** | SKILL.md가 수정 대상이면 EDIT4 프로토콜 진입 전 skill-builder 발동 필수. "수정해" 요청 → EDIT4 레벨 판정 전에 파일명이 SKILL.md인지 체크 → 맞으면 skill-builder 먼저. 미발동 직접 수정 = FAIL |
 | handoff.json 있는데 skills-plugin에서 복사 | 오토루프 최적화 결과를 덮어쓴다. step 0 핸드오프 감지를 반드시 먼저 확인 |
 | handoff 경로에서 ② 편집 시도 | 오토루프가 이미 최적화 완료. 편집은 스킵하고 ②-b → ③으로 직행. 추가 수정 필요 시 형에게 확인 |
+| **.skill 파일명에 `-1` 등 접미사** | 원본 폴더명 **그대로** 사용. zip 전 `rm -f {skill-name}.skill` 선제거. 형의 명시적 네이밍 변경 지시 없으면 접미사 금지 |
