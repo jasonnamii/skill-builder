@@ -43,6 +43,7 @@ SESSION = /sessions/{session-id}/
 0. 핸드오프 감지 (최우선):
    - 세션에 autoloop-lab/{skill-name}/handoff.json 존재?
    - YES → 핸드오프 경로. 아래 1~3 스킵. 오토루프 실험장을 세션 작업본으로 직접 사용.
+     **전제: autoloop step 6(볼트 반영) 완료 확인 필수.** handoff.json의 존재만으로는 불충분 — 볼트 원본이 최신인지 diff 확인 후 진행.
      SESSION_SKILL = /sessions/{session-id}/autoloop-lab/{skill-name}/
      handoff.json 읽기 → 점수·변경 요약 확인 → ②-b 검증+성능게이트 → ③ 패키징으로 직행.
      ② 편집은 스킵 (오토루프가 이미 최적화 완료).
