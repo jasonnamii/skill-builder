@@ -5,7 +5,7 @@ description: |
   P1: 스킬, skill, SKILL.md, 패키징, 검증, 스킬만들기, 스킬수정, 스킬고치기, 스킬리팩터링, 스킬고도화.
   P2: 만들어줘, 수정해줘, 고쳐줘, 재작성해줘, 고도화해줘, validate, create, fix, refactor.
   P3: skill creation, skill modification, skill refactoring, description optimization.
-  P4: SKILL.md 편집시, 스킬 구조 변경시, autoloop 완료 후 패키징시, EDIT4 대상=SKILL.md면 선발동 필수.
+  P4: SKILL.md 편집시, 스킬 하위파일(references/ 등) 수정시, 스킬 구조 변경시, autoloop 완료 후 패키징시, EDIT4 대상=SKILL.md면 선발동 필수, "{스킬명} 수정" 패턴 감지시.
   P5: .skill로.
   NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 스킬최적화루프(→autoloop), 다른 스킬 단순 사용(→해당 스킬).
 ---
@@ -210,3 +210,4 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 | handoff.json 있는데 skills-plugin에서 복사 | 오토루프 최적화 결과를 덮어쓴다. step 0 핸드오프 감지를 반드시 먼저 확인 |
 | handoff 경로에서 ② 편집 시도 | 오토루프가 이미 최적화 완료. 편집은 스킵하고 ②-b → ③으로 직행. 추가 수정 필요 시 형에게 확인 |
 | **.skill 파일명에 `-1` 등 접미사** | 원본 폴더명 **그대로** 사용. zip 전 `rm -f {skill-name}.skill` 선제거. 형의 명시적 네이밍 변경 지시 없으면 접미사 금지 |
+| **"{스킬명} 수정" 패턴 미감지** | P1 "스킬수정"은 일반어. "{디자인스킬/리서치프레임 등} 수정하자"처럼 특정 스킬명+수정 동사 조합도 skill-builder 발동 대상. references/ 하위 파일만 수정해도 .skill 패키징이 필요하므로 skill-builder 경유 필수 |
