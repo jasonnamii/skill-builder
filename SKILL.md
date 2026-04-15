@@ -211,3 +211,4 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 | handoff 경로에서 ② 편집 시도 | 오토루프가 이미 최적화 완료. 편집은 스킵하고 ②-b → ③으로 직행. 추가 수정 필요 시 형에게 확인 |
 | **.skill 파일명에 `-1` 등 접미사** | 원본 폴더명 **그대로** 사용. zip 전 `rm -f {skill-name}.skill` 선제거. 형의 명시적 네이밍 변경 지시 없으면 접미사 금지 |
 | **"{스킬명} 수정" 패턴 미감지** | P1 "스킬수정"은 일반어. "{디자인스킬/리서치프레임 등} 수정하자"처럼 특정 스킬명+수정 동사 조합도 skill-builder 발동 대상. references/ 하위 파일만 수정해도 .skill 패키징이 필요하므로 skill-builder 경유 필수 |
+| **서브에이전트에서 present_files 호출** | Agent tool 내부 세션 경로는 호스트에서 resolve 불가 → `INVALID_PATH`. **③의 zip+cp는 서브에이전트에서 가능하지만, `present_files`는 반드시 부모 세션(메인 대화)에서 호출**. 서브에이전트는 `.skill` 파일 경로만 반환 → 부모가 present |
