@@ -8,6 +8,7 @@ description: |
   P4: SKILL.md 편집, references 수정, autoloop 완료, EDIT4 대상=SKILL.md, {스킬명} 수정 감지.
   P5: .skill로.
   NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 스킬최적화루프(→autoloop).
+vault_dependency: HARD
 ---
 
 # Skill Builder
