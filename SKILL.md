@@ -1,13 +1,13 @@
 ---
 name: skill-builder
 description: |
-  스킬 생성·수정·패키징 게이트키퍼. PREFLIGHT·진단·리팩터링·트리거설계·검증·성능게이트·.skill 패키징. autoloop handoff 지원.
-  P1: 스킬, skill, SKILL.md, 패키징, 검증, 스킬수정, 스킬생성, 스킬고도화.
-  P2: 만들어줘, 수정해줘, 고쳐줘, 재작성, validate, create, fix, refactor.
+  스킬 생성·수정·패키징 **게이트키퍼** — mnt/.claude/skills/ 하위 파일 수정·생성 전 반드시 Skill tool 발동. 미발동=FAIL.
+  P1: 스킬, skill, SKILL.md, 스킬수정, 스킬생성, 스킬업데이트, 스킬개선, 트리거수정, description수정, 게이트키퍼, 패키징, 검증.
+  P2: 만들어줘, 수정해줘, 수정하자, 고쳐줘, 바꿔줘, 업데이트, 개선, 편집, 손봐, create, fix, refactor, update, modify.
   P3: skill creation, skill modification, skill refactoring.
-  P4: SKILL.md 편집, references 수정, autoloop 완료, EDIT4 대상=SKILL.md, {스킬명} 수정 감지.
+  P4: SKILL.md·references/·scripts/ 편집, {스킬명}+수정동사 조합, autoloop 완료.
   P5: .skill로.
-  NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 스킬최적화루프(→autoloop).
+  NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 최적화루프(→autoloop), UP수정(→up-manager).
 vault_dependency: HARD
 ---
 
@@ -21,7 +21,7 @@ vault_dependency: HARD
 
 | # | 규칙 | 이유 |
 |---|------|------|
-| 1 | **게이트키퍼** — SKILL.md 수정·생성 전 **반드시 `Skill tool`로 skill-builder 발동**. 도구 무관. 미발동 수정 = FAIL | 진단→수정 전환 시 발동 누락이 가장 흔한 위반 |
+| 1 | **게이트키퍼** — `mnt/.claude/skills/` 하위 **어떤 파일이든**(SKILL.md·references/·scripts/·assets/) 수정·생성·삭제·이름변경 전 **반드시 `Skill tool`로 skill-builder 발동**. 도구 무관(Edit/Write/Bash mv/Bash rm 전부 해당). **감지 기준:** ①파일 경로가 `mnt/.claude/skills/` 하위 ②대화에 스킬명+수정동사 조합 ③"스킬 수정/고쳐/바꿔/업데이트" 언급 — 하나라도 걸리면 즉시 Skill tool 호출. 판정·PREFLIGHT는 그 이후. 미발동 수정 = FAIL | 진단→수정 전환 / EDIT4 직행 / references만 수정 / 스킬명 거론 후 바로 Edit — 이 4패턴이 가장 흔한 위반 |
 | 2 | **수정 완료 = .skill 패키징 제공** | 사용자가 설치할 수 없음 |
 | 3 | **세션 내 직접 편집** — 원본(ORIGIN)을 세션으로 복사 → Cowork Edit/Write로 수정 → zip → present. FS MCP는 plugin_skills_path 반영 시에만 사용. **재시도 루프 금지** | 세션 도구가 가장 빠르고 경로 혼선 없음 |
 | 4 | **루프 하드캡** — 모든 재시도·검증 순회 **max 2회**. 초과 → 보고 + STOP | 무한 루프 방지 |
