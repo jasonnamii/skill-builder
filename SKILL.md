@@ -1,13 +1,13 @@
 ---
 name: skill-builder
 description: |
-  스킬 생성·수정·패키징 게이트키퍼. 진단·리팩터링·재작성·트리거설계·검증·성능게이트·.skill 패키징. autoloop handoff 지원.
-  P1: 스킬, skill, SKILL.md, 패키징, 검증, 스킬만들기, 스킬수정, 스킬고치기, 스킬리팩터링, 스킬고도화.
-  P2: 만들어줘, 수정해줘, 고쳐줘, 재작성해줘, 고도화해줘, validate, create, fix, refactor.
-  P3: skill creation, skill modification, skill refactoring, description optimization.
-  P4: SKILL.md 편집시, 스킬 하위파일(references/ 등) 수정시, 스킬 구조 변경시, autoloop 완료 후 패키징시, EDIT4 대상=SKILL.md면 선발동 필수, "{스킬명} 수정" 패턴 감지시.
+  스킬 생성·수정·패키징 게이트키퍼. PREFLIGHT·진단·리팩터링·트리거설계·검증·성능게이트·.skill 패키징. autoloop handoff 지원.
+  P1: 스킬, skill, SKILL.md, 패키징, 검증, 스킬수정, 스킬생성, 스킬고도화.
+  P2: 만들어줘, 수정해줘, 고쳐줘, 재작성, validate, create, fix, refactor.
+  P3: skill creation, skill modification, skill refactoring.
+  P4: SKILL.md 편집, references 수정, autoloop 완료, EDIT4 대상=SKILL.md, {스킬명} 수정 감지.
   P5: .skill로.
-  NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 스킬최적화루프(→autoloop), 다른 스킬 단순 사용(→해당 스킬).
+  NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 스킬최적화루프(→autoloop).
 ---
 
 # Skill Builder
@@ -16,7 +16,7 @@ description: |
 
 ---
 
-## ⛔ 절대 규칙 (5개)
+## ⛔ 절대 규칙 (6개)
 
 | # | 규칙 | 이유 |
 |---|------|------|
@@ -25,13 +25,35 @@ description: |
 | 3 | **세션 내 직접 편집** — 원본(ORIGIN)을 세션으로 복사 → Cowork Edit/Write로 수정 → zip → present. FS MCP는 plugin_skills_path 반영 시에만 사용. **재시도 루프 금지** | 세션 도구가 가장 빠르고 경로 혼선 없음 |
 | 4 | **루프 하드캡** — 모든 재시도·검증 순회 **max 2회**. 초과 → 보고 + STOP | 무한 루프 방지 |
 | 5 | **원본 유일 = skills-plugin** — 매번 원본에서 새로 가져와야 한다. 반영은 형이 .skill 설치로 직접 수행. **예외: autoloop handoff** — 세션에 `handoff.json`이 존재하면 오토루프 실험장의 최적화된 SKILL.md를 원본으로 사용 | 버전 꼬임 방지. handoff 예외는 오토루프가 이미 최신 검증을 완료했기 때문 |
+| 6 | **PREFLIGHT 선행** — 착수 전 **단일 Bash 1회**로 경로·권한·출력경로 3체크. 실패 감지 시 STOP + 보고. 체크 없이 ① 진입 = FAIL | 중간실패 N턴 예방 — EROFS·세션복사본 Read 누락·출력경로 미존재 전부 1턴으로 차단 |
+
+---
+
+## 🚦 PREFLIGHT (착수 전 필수 — 1회 단일 Bash)
+
+**모든 스킬 수정·신규·진단은 이 체크 통과 후에만 ① 진입.**
+
+```bash
+# 단일 Bash로 3체크 병렬:
+echo "=== ① ORIGIN 경로·권한 ===" && ls -la mnt/.claude/skills/{skill}/SKILL.md 2>&1 | head -5 && \
+echo "=== ② SKILL.md 개수 ===" && find mnt/.claude/skills/{skill}/ -name "SKILL.md" | wc -l && \
+echo "=== ③ 출력 경로 ===" && ls -d mnt/*/ 2>&1 | grep -v uploads | grep -v .claude
+```
+
+| 체크 | 기준 | 실패 시 |
+|------|------|---------|
+| ① 경로·권한 | ORIGIN SKILL.md 존재·가독 | STOP + 스킬명 확인 요청 |
+| ② SKILL.md 1개 | `wc -l` = 1 | STOP (2개+ 시 zip 충돌) |
+| ③ 출력 경로 | 마운트 폴더 1개+ 확인 | 스크래치패드 사용으로 전환 |
+
+**Read-before-Edit 의무:** ① 단계에서 세션 복사본을 Cowork Read로 반드시 1회 이상 읽고 Edit 착수. 복사만으로는 불충분 — Cowork 파일추적 상태가 갱신되지 않으면 Edit 실패(`File has not been read yet`).
 
 ---
 
 ## 실행 흐름 — 선형 3단계
 
 ```
-① 읽기+판정 → [진단이면 보고+종료] → ② 편집 → ②-b 검증+성능게이트 → ③ 패키징+제공
+🚦 PREFLIGHT → ① 읽기+판정 → [진단이면 보고+종료] → ② 편집 → ②-b 검증+성능게이트 → ③ 패키징+제공
 ```
 
 ### ① 읽기 + 경로 판정
@@ -99,16 +121,20 @@ python scripts/validate.py ./{skill}/
 ### ③ 패키징 + 제공
 
 ```bash
-# 세션에서 직접 zip (WORKBENCH 경유 없음)
+# 세션 스크래치패드에서 직접 zip (WORKBENCH 경유 없음)
 cd /sessions/{session-id}
 rm -f {skill-name}.skill
 zip -r {skill-name}.skill {skill-name}/ \
   -x "*.pyc" -x "__pycache__/*" -x ".DS_Store" -x ".git/*" -x "*-workspace/*" -x "evals/*"
-cp {skill-name}.skill mnt/outputs/
 ```
 
+**출력 경로 — 우선순위:**
+1. **스크래치패드 직접 제공** (기본) — `/sessions/{session-id}/{skill-name}.skill`. present_files가 자동으로 outputs 폴더로 복사. mv·cp 불필요.
+2. **마운트 폴더 명시 요청 시만** — `cp {skill-name}.skill mnt/{마운트폴더명}/` (PREFLIGHT ③에서 확인한 실존 경로)
+3. `mnt/outputs/` 임의 생성 금지 — 해당 경로는 환경 기본값이 아님. 임의 mkdir → present_files INVALID_PATH 오류 유발
+
 ```
-mcp__cowork__present_files([{"file_path": "/sessions/{session-id}/mnt/outputs/{skill-name}.skill"}])
+mcp__cowork__present_files([{"file_path": "/sessions/{session-id}/{skill-name}.skill"}])
 ```
 
 **네이밍 절대규칙:** .skill 파일명 = 원본 스킬 폴더명 **그대로**. `-1`, `-2`, `_copy` 등 접미사 절대 금지. 형이 명시적으로 네이밍 변경을 지시한 경우만 예외. zip 전 `rm -f {skill-name}.skill`로 기존 파일 선제거 → 중복 회피 접미사 원천 차단.
@@ -212,3 +238,6 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 | **.skill 파일명에 `-1` 등 접미사** | 원본 폴더명 **그대로** 사용. zip 전 `rm -f {skill-name}.skill` 선제거. 형의 명시적 네이밍 변경 지시 없으면 접미사 금지 |
 | **"{스킬명} 수정" 패턴 미감지** | P1 "스킬수정"은 일반어. "{디자인스킬/리서치프레임 등} 수정하자"처럼 특정 스킬명+수정 동사 조합도 skill-builder 발동 대상. references/ 하위 파일만 수정해도 .skill 패키징이 필요하므로 skill-builder 경유 필수 |
 | **서브에이전트에서 present_files 호출** | Agent tool 내부 세션 경로는 호스트에서 resolve 불가 → `INVALID_PATH`. **③의 zip+cp는 서브에이전트에서 가능하지만, `present_files`는 반드시 부모 세션(메인 대화)에서 호출**. 서브에이전트는 `.skill` 파일 경로만 반환 → 부모가 present |
+| **mnt/outputs/ 임의 생성** | 기본 환경에 없음. `mkdir` 후 cp하면 present_files에서 `INVALID_PATH`. 스크래치패드 직접 제공 또는 PREFLIGHT ③에서 확인한 마운트 폴더만 사용 |
+| **세션 복사본 Read 누락** | `cp -r` + `chmod`만으론 불충분. Cowork 파일추적 갱신 안 됨 → Edit 호출 시 `File has not been read yet` 오류. 세션 경로로 **Cowork Read 1회 수행 후** Edit 착수 |
+| **PREFLIGHT 누락 직행** | 경로·권한·출력경로 미확인 상태로 cp·Edit·zip 진행하면 중간단계 연쇄 실패. 절대규칙 #6 위반 — 착수 전 단일 Bash 1회 필수 |
