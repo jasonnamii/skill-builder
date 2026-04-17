@@ -1,19 +1,20 @@
 ---
 name: skill-builder
+version: 1.1.0
 description: |
-  스킬 생성·수정·패키징 **게이트키퍼** — mnt/.claude/skills/ 하위 파일 수정·생성 전 반드시 Skill tool 발동. 미발동=FAIL.
-  P1: 스킬, skill, SKILL.md, 스킬수정, 스킬생성, 스킬업데이트, 스킬개선, 트리거수정, description수정, 게이트키퍼, 패키징, 검증.
+  스킬 파일 수정·생성·패키징 **게이트키퍼** — mnt/.claude/skills/ 하위 파일 수정·생성 전 반드시 Skill tool 발동. 미발동=FAIL.
+  P1: SKILL.md, 스킬수정, 스킬생성, 스킬업데이트, 스킬개선, 스킬패키징, 스킬검증, 트리거수정, 게이트키퍼.
   P2: 만들어줘, 수정해줘, 수정하자, 고쳐줘, 바꿔줘, 업데이트, 개선, 편집, 손봐, create, fix, refactor, update, modify.
   P3: skill creation, skill modification, skill refactoring.
   P4: SKILL.md·references/·scripts/ 편집, {스킬명}+수정동사 조합, autoloop 완료.
-  P5: .skill로.
+  P5: .skill로, 패키지로, zip으로.
   NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 최적화루프(→autoloop), UP수정(→up-manager).
-vault_dependency: HARD
+vault_dependency: HARD  # 미마운트=STOP+보고. fallback 없음(SKILL 원본 접근 필수)
 ---
 
 # Skill Builder
 
-스킬 생성·수정·패키징. 선형 흐름 — 분기 최소, 루프 0.
+스킬 생성·수정·스킬패키징·스킬검증 1턴 게이트키퍼. 선형 흐름 — 분기 최소, 루프 0.
 
 **흐름:** 🚦 PREFLIGHT → ① 읽기+판정 → [진단이면 종료] → ② 편집 → ②-b 검증+성능게이트 → ③ 패키징+제공
 
@@ -112,53 +113,19 @@ cd /sessions/{session-id} && python scripts/validate.py ./{skill}/
 
 ## ③ 패키징 + 제공
 
-### ③-a 기존 산출물 선삭제 (필수) — `-1` 접미사 차단 3중 방어
+상세: `→ references/packaging-guide.md`
 
-```bash
-# 1. 세션 스크래치 제거
-cd /sessions/{session-id}
-rm -f {skill-name}.skill {skill-name}-*.skill    # 기존 + 이전 접미사본 전부
+**핵심 순서:** ③-a 선삭제(세션+mnt/outputs 양쪽) → ③-b zip → ③-c present_files → ③-d 검증(1개·접미사 없음)
 
-# 2. 마운트 산출물 존재 확인 (덮어쓰기 불가 환경 대비)
-ls -la mnt/outputs/{skill-name}*.skill 2>/dev/null
-```
+| 단계 | 한 줄 요약 |
+|---|---|
+| ③-a | `rm -f {skill}.skill`·mnt 구파일 존재 시 `allow_cowork_file_delete` |
+| ③-b | `zip -r {skill}.skill {skill}/ -x "*.pyc" "__pycache__/*" ".DS_Store" "evals/*"` |
+| ③-c | 스크래치패드 `/sessions/{id}/{skill}.skill` → `present_files` (기본) |
+| ③-d | `ls mnt/outputs/{skill}*.skill` = 1개·접미사 없음 |
 
-**마운트(`mnt/outputs/`)에 구파일 존재 시 필수 절차:**
-1. 사용자에게 "이전 `{skill-name}.skill` 있음. 교체할까요?" 1줄 컨펌
-2. 컨펌 시 → `mcp__cowork__allow_cowork_file_delete` 호출 → `rm mnt/outputs/{skill-name}.skill`
-3. 미삭제 상태로 present_files 진행 → **Cowork 또는 Mac 로컬이 `-1` 접미사 자동 부여** (= 버전 꼬임 근본원인)
-
-### ③-b zip 생성
-
-```bash
-cd /sessions/{session-id}
-zip -r {skill-name}.skill {skill-name}/ \
-  -x "*.pyc" -x "__pycache__/*" -x ".DS_Store" -x ".git/*" -x "*-workspace/*" -x "evals/*"
-```
-
-### ③-c 제공
-
-**출력 경로 우선순위:**
-1. **스크래치패드 직접 제공 (기본)** — `/sessions/{session-id}/{skill-name}.skill`. present_files가 outputs 폴더로 자동 복사. **단 ③-a 선삭제 미수행 시 `-1` 자동 접미사 위험** — 선삭제 반드시.
-2. **마운트 폴더 명시 요청 시만** — `cp {skill-name}.skill mnt/{마운트폴더명}/` (PREFLIGHT ③에서 확인한 실존 경로). 대상 파일 존재 시 ③-a의 `allow_cowork_file_delete` 선행.
-3. **`mnt/outputs/` 임의 생성 금지** — 환경 기본값 아님. 임의 mkdir → present_files INVALID_PATH
-
-```
-mcp__cowork__present_files([{"file_path": "/sessions/{session-id}/{skill-name}.skill"}])
-```
-
-### ③-d 검증
-
-```bash
-ls -la mnt/outputs/{skill-name}*.skill    # 정확히 1개, 접미사 없음 확인
-```
-
-2개+ 발견 → ③-a 재실행(구파일 삭제) → 재패키징. **루프 하드캡 2회 초과 시 STOP + 형에게 수동 정리 요청.**
-
-**네이밍:** .skill 파일명 = 원본 폴더명 **그대로**. `-1`·`_copy` 접미사 금지(형의 명시적 지시 시만 예외).
-**재패키징:** 기존 .skill → 형 컨펌 → `allow_cowork_file_delete` → 재zip.
-**서브에이전트:** zip+cp는 가능. `present_files`는 반드시 부모 세션(메인 대화)에서 호출.
-**git-sync:** 패키징 완료 후 "git push 할까요?" 1줄 제안. 형 컨펌 시 git-sync 발동.
+**절대:** `-1`·`_copy` 접미사 = FAIL → ③-a 재실행. 루프 하드캡 2회.
+**패키징 완료 후:** "git push 할까요?" 1줄 제안 → 컨펌 시 git-sync 발동.
 
 ---
 
@@ -204,3 +171,4 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 | SKILL.md 2개 | zip 전 `find {skill}/ -name "SKILL.md" \| wc -l`로 1 확인 |
 | handoff.json 있는데 skills-plugin 복사 | 오토루프 최적화 결과 덮어씀. ①.0 핸드오프 감지 먼저 |
 | `.skill` 파일에 `-1`·`-2` 접미사 자동 부착 | 마운트 구파일 미삭제 → Cowork/Mac 덮어쓰기 회피 로직 작동. ③-a 선삭제 필수(세션 + mnt/outputs 양쪽) |
+| 패키징 반복 실패·설치 후 동작 이상 | 원인 재현 불가 시 thumbs-down으로 Anthropic 피드백. CHANGELOG.md에 실패 유형·재현조건 기록 |
