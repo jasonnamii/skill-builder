@@ -4,6 +4,30 @@
 
 ---
 
+## 1.2.0 — 2026-04-21
+
+**트리거:** 형 수동 요청 — "리서치 필요 스킬 작업 시 스킬빌더 강제 발동 + 리서치 결과 VAULT 저장 강제"
+
+### Added
+- **절대 규칙 #7 신설** — 리서치 결과 VAULT 저장 강제. 세션·`mnt/outputs/`·스크래치패드 저장 = FAIL. 저장 경로 규약: `VAULT/_skills research/{skill-name}/{YYYY-MM-DD}_{topic}.md`
+- **⓵ 리서치필요 판정 섹션 신설** — PREFLIGHT 직후 배치. 판정 기준·강제 흐름·frontmatter 규약·감지 키워드 명시
+- 규칙 #1 감지 조건 ⑥ 추가 — "리서치 필요 스킬 생성·수정" 강제 발동 트리거
+- description P1 확장 — `리서치스킬, 리서치기반스킬` 추가
+- description P3 확장 — `research-backed skill` 추가
+- description P4 확장 — 도메인 리서치 선행 스킬 신설 명시
+- description P5 확장 — `리서치 결과는 VAULT/_skills research/로` 명시
+- Gotchas 2행 추가 — 리서치 세션 저장 함정 / WebSearch 직접 붙여넣기 함정
+
+### Changed
+- 절대 규칙 개수 6개 → 7개
+- 흐름에 `ⓘ 리서치필요 판정` 단계 삽입
+- description 첫줄에 리서치 강제 발동·VAULT 저장 강제 한줄 요약 추가
+
+### Rationale
+세션 종료 시 리서치 자료 전량 소실 위험. 스킬 자체는 재생성 가능하지만 리서치 원본·출처는 복구 불가. 게이트키퍼 범위를 "파일 편집"에서 "리서치 자료까지"로 확장.
+
+---
+
 ## 1.1.0 — 2026-04-17
 
 **트리거:** skill-doctor 진단 🟠 75.8/100 (ORANGE) → 처방 P0+P1+선택 P2 적용

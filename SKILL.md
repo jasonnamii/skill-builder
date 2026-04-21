@@ -1,13 +1,13 @@
 ---
 name: skill-builder
-version: 1.1.0
+version: 1.2.0
 description: |
-  스킬 파일 수정·생성·패키징 **게이트키퍼** — mnt/.claude/skills/ 하위 파일 수정·생성 전 반드시 Skill tool 발동. 미발동=FAIL.
-  P1: SKILL.md, 스킬수정, 스킬생성, 스킬업데이트, 스킬개선, 스킬패키징, 스킬검증, 트리거수정, 게이트키퍼.
-  P2: 만들어줘, 수정해줘, 수정하자, 고쳐줘, 바꿔줘, 업데이트, 개선, 편집, 손봐, create, fix, refactor, update, modify.
-  P3: skill creation, skill modification, skill refactoring.
-  P4: SKILL.md·references/·scripts/ 편집, {스킬명}+수정동사 조합, autoloop 완료.
-  P5: .skill로, 패키지로, zip으로.
+  스킬 수정·생성·패키징 **게이트키퍼** — mnt/.claude/skills/ 수정·생성 전 Skill tool 발동. **리서치스킬 강제발동 + 리서치 VAULT 저장 강제**.
+  P1: SKILL.md, 스킬수정, 스킬생성, 스킬업데이트, 스킬개선, 스킬패키징, 스킬검증, 트리거수정, 게이트키퍼, 리서치스킬, 리서치기반스킬.
+  P2: 만들어줘, 수정해줘, 고쳐줘, 바꿔줘, 업데이트, create, fix, update.
+  P3: skill creation, skill modification, research-backed skill.
+  P4: SKILL.md·references/·scripts/ 편집, {스킬명}+수정동사, autoloop 완료.
+  P5: .skill로, 리서치는 VAULT/_skills research/로.
   NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 최적화루프(→autoloop), UP수정(→up-manager).
 vault_dependency: HARD  # 미마운트=STOP+보고. fallback 없음(SKILL 원본 접근 필수)
 ---
@@ -16,20 +16,21 @@ vault_dependency: HARD  # 미마운트=STOP+보고. fallback 없음(SKILL 원본
 
 스킬 생성·수정·스킬패키징·스킬검증 1턴 게이트키퍼. 선형 흐름 — 분기 최소, 루프 0.
 
-**흐름:** 🚦 PREFLIGHT → ① 읽기+판정 → [진단이면 종료] → ② 편집 → ②-b 검증+성능게이트 → ③ 패키징+제공
+**흐름:** 🚦 PREFLIGHT → ⓘ 리서치필요 판정 → ① 읽기+판정 → [진단이면 종료] → ② 편집 → ②-b 검증+성능게이트 → ③ 패키징+제공
 
 ---
 
-## ⛔ 절대 규칙 (6개)
+## ⛔ 절대 규칙 (7개)
 
 | # | 규칙 | 이유 |
 |---|------|------|
-| 1 | **게이트키퍼** — `mnt/.claude/skills/` 하위 **어떤 파일이든**(SKILL.md·references/·scripts/·assets/) 수정·생성·삭제·이름변경 전 **반드시 `Skill tool`로 skill-builder 발동**. 도구 무관(Edit/Write/Bash mv/Bash rm). **감지:** ①경로가 `mnt/.claude/skills/` 하위 ②대화에 스킬명+수정동사 ③"스킬 수정/고쳐/바꿔/업데이트" 언급 ④진단→수정 전환 ⑤EDIT4 직행 — 하나라도 걸리면 Skill tool 호출 먼저 | description이 발동 판단 유일 입력. 미발동 = 버전 꼬임·검증 누락 |
+| 1 | **게이트키퍼** — `mnt/.claude/skills/` 하위 **어떤 파일이든**(SKILL.md·references/·scripts/·assets/) 수정·생성·삭제·이름변경 전 **반드시 `Skill tool`로 skill-builder 발동**. 도구 무관(Edit/Write/Bash mv/Bash rm). **감지:** ①경로가 `mnt/.claude/skills/` 하위 ②대화에 스킬명+수정동사 ③"스킬 수정/고쳐/바꿔/업데이트" 언급 ④진단→수정 전환 ⑤EDIT4 직행 ⑥**리서치 필요 스킬 생성·수정** (도메인지식·사례·레퍼런스·벤치마킹 수집 선행) — 하나라도 걸리면 Skill tool 호출 먼저 | description이 발동 판단 유일 입력. 미발동 = 버전 꼬임·검증 누락·리서치 결과 세션 소실 |
 | 2 | **수정 완료 = .skill 패키징 제공** | 사용자가 설치할 수 없음 |
 | 3 | **세션 내 직접 편집** — 원본→세션 복사 → Cowork Edit/Write → zip → present. FS MCP는 plugin_skills_path 반영 시에만 | 세션 도구가 최단 경로. WORKBENCH 경유 = 이원화 병목 |
 | 4 | **루프 하드캡** — 재시도·검증 순회 **max 2회**. 초과 → 보고 + STOP | 무한 루프 방지 |
 | 5 | **원본 유일 = skills-plugin** — 매번 원본에서 새로. **예외: autoloop handoff** — 세션에 `handoff.json` 존재 시 오토루프 실험장을 원본으로 사용 | 버전 꼬임 방지. handoff는 오토루프 검증 완료 상태 |
 | 6 | **PREFLIGHT 선행** — 착수 전 단일 Bash 1회로 경로·권한·출력경로 3체크 + 세션 복사본 Read 1회. 미수행 시 ① 진입 = FAIL | EROFS·Read 누락·출력경로 미존재 연쇄 실패 1턴 차단 |
+| 7 | **리서치 결과 = VAULT 저장 강제** — 스킬 생성·수정 중 발생하는 **모든 리서치 산출물**(웹리서치·도메인분석·벤치마킹·사례수집·레퍼런스정리·WebSearch 결과)은 **무조건 VAULT에 저장**. 세션·`mnt/outputs/`·스크래치패드 저장 = FAIL. 볼트 미마운트 시 `request_cowork_directory`로 선마운트 → 거부 시 STOP+보고. 저장 경로: `VAULT/_skills research/{skill-name}/{YYYY-MM-DD}_{topic}.md`. SKILL.md 본문에는 요약·포인터만, 원본 리서치는 볼트에 | 세션 종료 = 리서치 전량 소실. 스킬은 재생성 가능하지만 리서치는 복구 불가 |
 
 ---
 
@@ -48,6 +49,35 @@ echo "=== ③ 출력 경로 ===" && ls -d mnt/*/ 2>&1 | grep -v uploads | grep -
 | ③ 출력 경로 | 마운트 폴더 1개+ | 스크래치패드로 전환 |
 
 **Read-before-Edit 의무:** 세션 복사본을 Cowork Read로 1회 이상 읽고 Edit 착수. `cp + chmod`만으론 Cowork 파일추적 갱신 안 됨 → `File has not been read yet` 에러.
+
+---
+
+## ⓘ 리서치 필요 판정 + VAULT 저장 (규칙 #7)
+
+**판정:** 스킬 생성·수정에 외부 지식 수집이 필요한가?
+- 도메인 이론·법령·사례·벤치마크·레퍼런스·통계 등 **본문에 반영할 근거자료**가 필요하면 = **리서치스킬**(리서치기반스킬)
+- 기존 SKILL.md 구조·트리거·문구만 손대는 경미 편집 = 리서치 불필요
+
+**리서치 필요 시 강제 흐름:**
+1. **VAULT 마운트 확인** → 없으면 `request_cowork_directory`로 VAULT 경로 마운트 요청. 거부 시 STOP+보고.
+2. **저장 경로:** `VAULT/_skills research/{skill-name}/{YYYY-MM-DD}_{topic}.md`
+   - 디렉토리 없으면 자동 생성
+   - 파일명에 topic 슬러그 포함 (예: `2026-04-21_m&a-redflag-catalog.md`)
+3. **저장 원칙:**
+   - 원본 리서치(웹소스·raw 발췌·링크·인용문)는 **VAULT에만**
+   - SKILL.md 본문에는 **요약 + 볼트 포인터** (`→ VAULT/_skills research/{skill-name}/... 참조`)
+   - 세션·`mnt/outputs/`·스크래치패드에 리서치 자료 저장 = FAIL
+4. **볼트 파일 frontmatter (필수):**
+   ```yaml
+   ---
+   skill: {skill-name}
+   date: YYYY-MM-DD
+   topic: {topic-slug}
+   sources: [url1, url2, ...]
+   ---
+   ```
+
+**감지 키워드:** 리서치·조사·벤치마킹·사례·레퍼런스·도메인·최신동향·법령·통계·웹서치 — 하나라도 작업 맥락에 등장하면 리서치 필요 스킬로 판정.
 
 ---
 
@@ -172,3 +202,5 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 | handoff.json 있는데 skills-plugin 복사 | 오토루프 최적화 결과 덮어씀. ①.0 핸드오프 감지 먼저 |
 | `.skill` 파일에 `-1`·`-2` 접미사 자동 부착 | 마운트 구파일 미삭제 → Cowork/Mac 덮어쓰기 회피 로직 작동. ③-a 선삭제 필수(세션 + mnt/outputs 양쪽) |
 | 패키징 반복 실패·설치 후 동작 이상 | 원인 재현 불가 시 thumbs-down으로 Anthropic 피드백. CHANGELOG.md에 실패 유형·재현조건 기록 |
+| 리서치 자료를 세션·`mnt/outputs/`에 저장 | 세션 종료 시 전량 소실. 규칙 #7 위반 = FAIL. 반드시 VAULT로. 볼트 미마운트 시 request_cowork_directory 선행 |
+| VAULT 마운트 허락 없이 WebSearch 결과를 스킬 본문에 직접 붙여넣기 | 원본 소실·출처 단절. 볼트 저장 후 포인터로 연결 |
