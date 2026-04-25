@@ -1,6 +1,6 @@
 ---
 name: skill-builder
-version: 1.2.0
+version: 1.3.0
 description: |
   스킬 수정·생성·패키징 **게이트키퍼** — mnt/.claude/skills/ 수정·생성 전 Skill tool 발동. **리서치스킬 강제발동 + 리서치 VAULT 저장 강제**.
   P1: SKILL.md, 스킬수정, 스킬생성, 스킬업데이트, 스킬개선, 스킬패키징, 스킬검증, 트리거수정, 게이트키퍼, 리서치스킬, 리서치기반스킬.
@@ -20,7 +20,7 @@ vault_dependency: HARD  # 미마운트=STOP+보고. fallback 없음(SKILL 원본
 
 ---
 
-## ⛔ 절대 규칙 (7개)
+## ⛔ 절대 규칙 (8개)
 
 | # | 규칙 | 이유 |
 |---|------|------|
@@ -31,6 +31,7 @@ vault_dependency: HARD  # 미마운트=STOP+보고. fallback 없음(SKILL 원본
 | 5 | **원본 유일 = skills-plugin** — 매번 원본에서 새로. **예외: autoloop handoff** — 세션에 `handoff.json` 존재 시 오토루프 실험장을 원본으로 사용 | 버전 꼬임 방지. handoff는 오토루프 검증 완료 상태 |
 | 6 | **PREFLIGHT 선행** — 착수 전 단일 Bash 1회로 경로·권한·출력경로 3체크 + 세션 복사본 Read 1회. 미수행 시 ① 진입 = FAIL | EROFS·Read 누락·출력경로 미존재 연쇄 실패 1턴 차단 |
 | 7 | **리서치 결과 = VAULT 저장 강제** — 스킬 생성·수정 중 발생하는 **모든 리서치 산출물**(웹리서치·도메인분석·벤치마킹·사례수집·레퍼런스정리·WebSearch 결과)은 **무조건 VAULT에 저장**. 세션·`mnt/outputs/`·스크래치패드 저장 = FAIL. 볼트 미마운트 시 `request_cowork_directory`로 선마운트 → 거부 시 STOP+보고. 저장 경로: `VAULT/_skills research/{skill-name}/{YYYY-MM-DD}_{topic}.md`. SKILL.md 본문에는 요약·포인터만, 원본 리서치는 볼트에 | 세션 종료 = 리서치 전량 소실. 스킬은 재생성 가능하지만 리서치는 복구 불가 |
+| 8 | **NO_WORK_LABEL 강제 주입** — 산출물 생성 스킬(P5에 `.md/.html/.docx/.pptx/.xlsx/.pdf` 포함, 또는 "산출물·보고서·기획안·제안서·문서·리포트" 직접 생성)을 **신규 생성·중간 수정**할 때 SKILL.md 흐름 직후 또는 절대규칙 첫 항목으로 `→ references/no-work-label-block.md`의 verbatim 블록을 **그대로 삽입**. 변형·요약·재배치 금지. ②-b 검증에서 누락 발견 = STOP + 재삽입. 경미 편집은 면제(이미 박혀있으면 통과) | 외부인이 사전 없이 못 읽는 작업 라벨(C:E:W:·Y2·4축 등) 산출물 누출 차단. 결정적 게이트(확률 ✗) |
 
 ---
 
@@ -138,6 +139,7 @@ cd /sessions/{session-id} && python scripts/validate.py ./{skill}/
 | 3 | 코드 대체 가능성 | validate.py → `automatable_sections` | `→ references/perf-checklist.md §코드화` |
 | 4 | 토큰 예산 | validate.py → `combined_tokens_estimate` (>30K 경고) | 스포크 추가 분리 |
 | 5 | 병목 구간 | validate.py → `phases_count` + 텍스트 비중 | 섹션 통합·압축 |
+| 6 | NO_WORK_LABEL 블록 (산출물 스킬만) | `grep -q "\[NO_WORK_LABEL\]" SKILL.md` | `→ references/no-work-label-block.md` verbatim 삽입 |
 
 ---
 
@@ -204,3 +206,4 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 | 패키징 반복 실패·설치 후 동작 이상 | 원인 재현 불가 시 thumbs-down으로 Anthropic 피드백. CHANGELOG.md에 실패 유형·재현조건 기록 |
 | 리서치 자료를 세션·`mnt/outputs/`에 저장 | 세션 종료 시 전량 소실. 규칙 #7 위반 = FAIL. 반드시 VAULT로. 볼트 미마운트 시 request_cowork_directory 선행 |
 | VAULT 마운트 허락 없이 WebSearch 결과를 스킬 본문에 직접 붙여넣기 | 원본 소실·출처 단절. 볼트 저장 후 포인터로 연결 |
+| 산출물 스킬에 NO_WORK_LABEL 블록 미주입·요약·변형 | 작업 라벨 누출 = 외부 독자 차단. verbatim 삽입 강제, 변형 시 ②-b에서 차단 |

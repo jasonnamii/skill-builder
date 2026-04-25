@@ -1,3 +1,17 @@
+## [1.3.0] - 2026-04-25
+
+### Added
+- **절대 규칙 #8 NO_WORK_LABEL 강제 주입** — 산출물 생성 스킬(P5에 .md/.html/.docx/.pptx/.xlsx/.pdf 포함) 신규/중간 수정 시 verbatim 블록 삽입 강제
+- `references/no-work-label-block.md` — verbatim 블록 단일 진실 소스 + 자체 스캔 체크리스트 6항 + BAD/GOOD 예시
+- ②-b 성능 게이트에 체크 #6 추가: `grep -q "\[NO_WORK_LABEL\]"` 자동 검증
+- 신규생성 섹션에 NO_WORK_LABEL 포인터 명시
+- Gotchas에 "블록 미주입·요약·변형" 함정 추가
+
+### Why
+- 작업 라벨(C:E:W:·Y2·4축·DOC_TYPE 등) 산출물 누출 = 외부 독자 차단
+- 결정적 게이트(확률 ✗) — 1만 페이지 1단어 누출도 FAIL
+- skill-builder 게이트 1곳 강제 = 신규/수정 모든 스킬에 자동 전파, 50+ 기존 스킬 일괄 패치 회귀위험 회피
+
 # Changelog — skill-builder
 
 게이트키퍼 스킬 변경이력. skill-doctor 진단·autoloop 최적화·수동 수정 모두 기록.
