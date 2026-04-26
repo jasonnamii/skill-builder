@@ -1,3 +1,36 @@
+## [1.4.0] - 2026-04-26 (베놈화)
+
+**트리거:** 형 요청 — "스킬빌더가 신규 스킬 만들 때도 안트로픽 권장사항이 자연 발현되도록 베놈처럼 적용"
+
+### 컨셉: 베놈 일체화
+별도 모듈 없이 validate.py와 new-skill-template.md에 안트로픽 공식 권장사항 자연 합체. 외관 동일, 신규 스킬 생성 시 안트로픽 DNA 자동 발현.
+
+### Added (validate.py — Anthropic 베놈)
+- description ≤1024자 (v1.3 500자 → v1.4 1024자, Anthropic 공식 한도)
+- description 모호 동사 검출 ("Helps with"·"Processes"·"Handles"·"Works with"·"Takes care of") → warning
+- description 1·2인칭 검출 (3인칭/명령형 권장) → warning
+- description 부정 경계 검출 (NOT:/DO NOT/except) → warning
+- license 필드 권장 → warning (anthropic-skills 4개 모두 보유)
+- SKILL.md ≤500줄 검사 (v1.3 KB만 → v1.4 줄수 추가, Anthropic 공식 권장)
+- metrics에 `skill_md_lines` 추가
+
+### Added (new-skill-template.md — Anthropic 발현)
+- 스켈레톤에 version·license 필드 자연 포함
+- description 작성 가이드: 3인칭/명령형, 모호 동사 금지 명시
+- 필수 체크리스트 8행 → 16행 확장 (Anthropic 공식 항목 통합)
+
+### Added (SKILL.md)
+- frontmatter version 1.3.0 → 1.4.0 + license 필드 신설
+- Lean 기준에 "≤500줄·결정적 작업 scripts/ 위임·❌WRONG/✅CORRECT 대조" 안트로픽 항목 자연 흡수
+- description 작성 권고에 "모호 동사 금지·3인칭·≤1024자" 1줄 통합
+
+### Why
+- v1.3까지: 형의 로컬 룰북 (5KB·500자 등)
+- v1.4 이후: 안트로픽 공식 + 로컬 룰 통합. 신규 스킬은 처음부터 안트로픽 표준 정합.
+- skill-doctor v2와 양방향 정합성 확보 — skill-doctor가 진단하는 항목을 skill-builder가 처음부터 충족
+
+---
+
 ## [1.3.0] - 2026-04-25
 
 ### Added

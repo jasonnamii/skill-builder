@@ -1,6 +1,7 @@
 ---
 name: skill-builder
-version: 1.3.0
+version: 1.4.0
+license: Proprietary. LICENSE.txt has complete terms
 description: |
   스킬 수정·생성·패키징 **게이트키퍼** — mnt/.claude/skills/ 수정·생성 전 Skill tool 발동. **리서치스킬 강제발동 + 리서치 VAULT 저장 강제**.
   P1: SKILL.md, 스킬수정, 스킬생성, 스킬업데이트, 스킬개선, 스킬패키징, 스킬검증, 트리거수정, 게이트키퍼, 리서치스킬, 리서치기반스킬.
@@ -168,8 +169,8 @@ cd /sessions/{session-id} && python scripts/validate.py ./{skill}/
 트리거: `→ references/trigger-guide.md`
 
 **트리거 티어 (최소):** P1 5+ / P2 2(한+영) / P3 2+ / P4 0-2 / P5 1+ / NOT 필수
-**Lean 기준:** SKILL.md 목표 5KB·최대 10KB / 표 우선 / 결정적 작업은 scripts/ / "왜" 필수 / 예시 1+ / Gotchas 필수
-**description은 적극적으로** — Claude는 스킬을 덜 쓰는 쪽으로 편향. 범위를 넓혀라.
+**Lean 기준:** SKILL.md 목표 5KB·최대 10KB·≤500줄 (Anthropic) / 표 우선 / 결정적 작업은 scripts/ (Anthropic) / "왜" 필수 / 예시 1+ / Gotchas 필수 / ❌WRONG/✅CORRECT 대조 권장
+**description은 적극적으로** — Claude는 스킬을 덜 쓰는 쪽으로 편향. 범위를 넓혀라. 단 모호 동사("Helps with"·"Processes"·"Handles") 금지, 3인칭/명령형, ≤1024자 (Anthropic 공식).
 
 ```
 skill-name/

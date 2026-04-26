@@ -9,8 +9,10 @@
 ```markdown
 ---
 name: {skill-name}
+version: 1.0.0
+license: Proprietary. LICENSE.txt has complete terms
 description: |
-  {핵심 용도 1문장. 무엇을 하는 스킬인지.}
+  {핵심 용도 1문장. 3인칭/명령형으로. "Helps with"·"Processes"·"Handles" 같은 모호 동사 금지.}
   P1: {고유 명사 키워드 5개+, 쉼표 구분}.
   P2: {동사 패턴 한+영 2개+}.
   P3: {영어 기술용어 2개+}.
@@ -61,18 +63,26 @@ description: |
 | {실패 패턴 2} | {대응 방법} |
 ```
 
-## 필수 체크리스트
+## 필수 체크리스트 (Anthropic 공식 베놈 + 로컬 룰)
 
 | 항목 | 근거 |
 |------|------|
 | YAML frontmatter 있음 | validate.py 파싱 필수 |
-| name: kebab-case | 설치 시 폴더명으로 사용 |
-| description ≤500자 | validate.py 하드 리밋 |
+| name: `^[a-z0-9-]{1,64}$` | Anthropic 공식 형식 |
+| version 필드 | 변경이력 추적 |
+| license 필드 | Anthropic 권장 (anthropic-skills 4개 모두 보유) |
+| description ≤1024자 | Anthropic 공식 한도 (≤900자 권장) |
+| description 3인칭/명령형, 모호 동사 금지 | Anthropic 권장 ("Helps with"·"Processes"·"Handles" 금지) |
+| description 부정 경계 (NOT/DO NOT/except) | cascade 명확성 |
 | P1 5개+, P2 2개+, P3 2개+, P5 1개+, NOT 필수 | 트리거 최소 요건 |
 | Gotchas 섹션 있음 | Lean 원칙: Gotchas 필수 |
-| SKILL.md ≤10KB | 토큰 예산 |
+| ❌WRONG/✅CORRECT 대조 1개+ | xlsx·docx 표준 패턴 (피드백 강화) |
+| Quick Reference 도입부 (첫 100줄 내) | 학습곡선 완화 (Anthropic 권장) |
+| SKILL.md ≤10KB·≤500줄 | 토큰 예산 + Anthropic 공식 |
+| 결정적 작업(검증·계산·파싱) → scripts/ 위임 | LLM 강요 안티패턴 차단 (Anthropic 권장) |
 | "왜" 있음 | 이유 없는 지시 → LLM이 무시 |
 | 예시 1개+ | 없으면 출력 자의적 |
+| CHANGELOG.md 신설 | 버전관리 |
 
 ## 폴더 구조
 

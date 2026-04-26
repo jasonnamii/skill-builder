@@ -48,25 +48,45 @@ def parse_yaml_frontmatter(content):
 
 
 def validate_frontmatter(fm, content):
-    """Validate YAML frontmatter structure and content."""
+    """Validate YAML frontmatter — v1.4 베놈: Anthropic 공식 권장사항 통합."""
     errors, warnings = [], []
+    # name: 형식 (Anthropic ^[a-z0-9-]{1,64}$)
     if 'name' not in fm:
         errors.append("Missing 'name' in frontmatter")
     elif not re.match(r'^[a-z0-9-]+$', fm['name']) or len(fm['name']) > 64:
         if not re.match(r'^[a-z0-9-]+$', fm['name']):
-            errors.append(f"Name '{fm['name']}' must be kebab-case")
+            errors.append(f"Name '{fm['name']}' must be kebab-case (Anthropic: ^[a-z0-9-]+$)")
         else:
-            errors.append(f"Name exceeds 64 chars ({len(fm['name'])})")
+            errors.append(f"Name exceeds 64 chars ({len(fm['name'])}) — Anthropic limit")
 
+    # description: 안트로픽 공식 한도 1024자 (v1.3 500자 → v1.4 1024자 정렬)
     if 'description' not in fm:
         errors.append("Missing 'description' in frontmatter")
-    elif len(fm['description']) > 500 or '\t' in fm['description']:
-        if len(fm['description']) > 500:
-            errors.append(f"Description exceeds 500 chars ({len(fm['description'])})")
-        if '\t' in fm['description']:
+    else:
+        desc = fm['description']
+        desc_len = len(desc)
+        if '\t' in desc:
             errors.append("Description contains tabs")
-        if len(fm['description']) > 400:
-            warnings.append(f"Description is long ({len(fm['description'])} chars)")
+        if desc_len > 1024:
+            errors.append(f"Description exceeds 1024 chars ({desc_len}) — Anthropic limit")
+        elif desc_len > 900:
+            warnings.append(f"Description near limit ({desc_len}/1024 chars)")
+        # v1.4 베놈: 모호 동사 검출 (Anthropic anti-pattern)
+        vague_verbs = ['helps with', 'processes', 'handles', 'works with', 'takes care of']
+        desc_lower = desc.lower()
+        vague_hits = [v for v in vague_verbs if v in desc_lower]
+        if vague_hits:
+            warnings.append(f"Description has vague verbs (Anthropic anti-pattern): {vague_hits}")
+        # v1.4 베놈: 1·2인칭 검출 (3인칭/명령형 권장)
+        if re.search(r'\b(I|me|my|you|your)\b', desc) or '우리는' in desc or '제가' in desc:
+            warnings.append("Description uses 1st/2nd person — Anthropic prefers 3rd person/imperative")
+        # v1.4 베놈: 부정 경계 명시 권장 (NOT/DO NOT/except)
+        if not re.search(r'NOT:|DO NOT|except|금지', desc, re.IGNORECASE):
+            warnings.append("Description lacks negative boundary (NOT:/DO NOT/except) — recommended for cascade clarity")
+
+    # v1.4 베놈: license 필드 권장 (anthropic-skills 4개 모두 보유)
+    if 'license' not in fm or not fm.get('license', '').strip():
+        warnings.append("Missing 'license' field — Anthropic recommends (e.g. 'Proprietary. LICENSE.txt has complete terms')")
 
     # Check @uses references (only in YAML frontmatter list format)
     uses = fm.get('"@uses"', '') or fm.get('@uses', '')
@@ -257,8 +277,14 @@ def validate_skill(skill_path):
 
     skill_bytes, skill_tokens = count_bytes_and_estimate_tokens(content)
     skill_kb = round(skill_bytes / 1024, 1)
+    skill_lines = content.count('\n') + 1
     if skill_kb > 10:
         warnings.append(f"SKILL.md is large ({skill_kb}KB, recommend <10KB)")
+    # v1.4 베놈: Anthropic 공식 권장 SKILL.md ≤500줄
+    if skill_lines > 500:
+        warnings.append(f"SKILL.md exceeds 500 lines ({skill_lines}) — Anthropic recommends progressive disclosure to references/")
+    elif skill_lines > 400:
+        warnings.append(f"SKILL.md near 500-line limit ({skill_lines})")
 
     p_tiers = parse_description_for_p_tiers(content)
     refs_bytes, refs_tokens = calculate_refs_size(skill_path)
@@ -297,7 +323,7 @@ def validate_skill(skill_path):
         warnings.append("NOT trigger not found (should have routing with →)")
 
     metrics = {
-        'skill_md_bytes': skill_bytes, 'skill_md_kb': skill_kb,
+        'skill_md_bytes': skill_bytes, 'skill_md_kb': skill_kb, 'skill_md_lines': skill_lines,
         'estimated_tokens': skill_tokens, 'description_chars': len(fm.get('description', '')),
         'refs_total_bytes': refs_bytes, 'refs_total_kb': round(refs_bytes / 1024, 1) if refs_bytes else 0,
         'combined_tokens_estimate': combined_tokens, 'p_tiers': p_tiers, 'hub_spoke': hub_spoke,
