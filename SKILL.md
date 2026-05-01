@@ -1,12 +1,12 @@
 ---
 name: skill-builder
-version: 1.4.0
+version: 1.5.0
 license: Proprietary. LICENSE.txt has complete terms
 description: |
-  스킬 수정·생성·패키징 **게이트키퍼** — mnt/.claude/skills/ 수정·생성 전 Skill tool 발동. **리서치스킬 강제발동 + 리서치 VAULT 저장 강제**.
-  P1: SKILL.md, 스킬수정, 스킬생성, 스킬업데이트, 스킬개선, 스킬패키징, 스킬검증, 트리거수정, 게이트키퍼, 리서치스킬, 리서치기반스킬.
+  스킬 수정·생성·패키징 **게이트키퍼** — mnt/.claude/skills/ 수정·생성 전 Skill tool 발동. **v1.5: PRE_WRITE_GUARD 사전생성형 전환** — ② 편집 *진입 전* 5종 룰 강제(본질질문·형식슬롯·트리거티어·단일책임·WRONG-CORRECT). 사후교정 → 사전생성. ②-b는 안전망 1회. **리서치스킬 강제발동 + 리서치 VAULT 저장 강제**.
+  P1: SKILL.md, 스킬수정, 스킬생성, 스킬업데이트, 스킬개선, 스킬패키징, 스킬검증, 트리거수정, 게이트키퍼, 리서치스킬, 리서치기반스킬, 사전가드, 작성가드, PRE_WRITE_GUARD.
   P2: 만들어줘, 수정해줘, 고쳐줘, 바꿔줘, 업데이트, create, fix, update.
-  P3: skill creation, skill modification, research-backed skill.
+  P3: skill creation, skill modification, research-backed skill, pre-write guard.
   P4: SKILL.md·references/·scripts/ 편집, {스킬명}+수정동사, autoloop 완료.
   P5: .skill로, 리서치는 VAULT/_skills research/로.
   NOT: 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 최적화루프(→autoloop), UP수정(→up-manager).
@@ -16,12 +16,13 @@ vault_dependency: HARD  # 미마운트=STOP+보고. fallback 없음(SKILL 원본
 # Skill Builder
 
 스킬 생성·수정·스킬패키징·스킬검증 1턴 게이트키퍼. 선형 흐름 — 분기 최소, 루프 0.
+**v1.5 사전생성형:** 작성 단계 *자체*에 룰 박제. ②-b는 안전망 1회로 격하. 사후교정 의존 ✗.
 
-**흐름:** 🚦 PREFLIGHT → ⓘ 리서치필요 판정 → ① 읽기+판정 → [진단이면 종료] → ② 편집 → ②-b 검증+성능게이트 → ③ 패키징+제공
+**흐름:** 🚦 PREFLIGHT → ⓘ 리서치필요 판정 → ① 읽기+판정 → [진단이면 종료] → **②-PRE PRE_WRITE_GUARD (5종 활성화)** → ② 편집 [룰 박힌 상태로 작성] → ②-b 안전망 검증 → ③ 패키징+제공
 
 ---
 
-## ⛔ 절대 규칙 (8개)
+## ⛔ 절대 규칙 (9개)
 
 | # | 규칙 | 이유 |
 |---|------|------|
@@ -33,6 +34,10 @@ vault_dependency: HARD  # 미마운트=STOP+보고. fallback 없음(SKILL 원본
 | 6 | **PREFLIGHT 선행** — 착수 전 단일 Bash 1회로 경로·권한·출력경로 3체크 + 세션 복사본 Read 1회. 미수행 시 ① 진입 = FAIL | EROFS·Read 누락·출력경로 미존재 연쇄 실패 1턴 차단 |
 | 7 | **리서치 결과 = VAULT 저장 강제** — 스킬 생성·수정 중 발생하는 **모든 리서치 산출물**(웹리서치·도메인분석·벤치마킹·사례수집·레퍼런스정리·WebSearch 결과)은 **무조건 VAULT에 저장**. 세션·`mnt/outputs/`·스크래치패드 저장 = FAIL. 볼트 미마운트 시 `request_cowork_directory`로 선마운트 → 거부 시 STOP+보고. 저장 경로: `VAULT/_skills research/{skill-name}/{YYYY-MM-DD}_{topic}.md`. SKILL.md 본문에는 요약·포인터만, 원본 리서치는 볼트에 | 세션 종료 = 리서치 전량 소실. 스킬은 재생성 가능하지만 리서치는 복구 불가 |
 | 8 | **NO_WORK_LABEL 강제 주입** — 산출물 생성 스킬(P5에 `.md/.html/.docx/.pptx/.xlsx/.pdf` 포함, 또는 "산출물·보고서·기획안·제안서·문서·리포트" 직접 생성)을 **신규 생성·중간 수정**할 때 SKILL.md 흐름 직후 또는 절대규칙 첫 항목으로 `→ references/no-work-label-block.md`의 verbatim 블록을 **그대로 삽입**. 변형·요약·재배치 금지. ②-b 검증에서 누락 발견 = STOP + 재삽입. 경미 편집은 면제(이미 박혀있으면 통과) | 외부인이 사전 없이 못 읽는 작업 라벨(C:E:W:·Y2·4축 등) 산출물 누출 차단. 결정적 게이트(확률 ✗) |
+| 9 | **PRE_WRITE_GUARD 사전생성형 (v1.5)** — ② 편집 *진입 전* 5종 룰 강제 활성화 → 룰 박힌 상태로 작성. ①본질질문(왜 이 스킬·룰이 필요한가, 기존 스킬로 안 되나) ②형식슬롯(P1·P2·P3·P5·NOT·Gotchas 사전박제) ③트리거티어(P1 5+/P2 한+영/P5 1+/NOT 필수) ④단일책임(NOT 명시로 영토 분리) ⑤WRONG-CORRECT 1쌍. 사후교정으로 룰 적용 = FAIL. ②-b는 안전망 1회로 격하 (적발 시 ② 재진입, 루프 max 2회) | paper-engine v3.1과 동일 본질. 사후교정형은 70% 쓰레기 잔존·토큰 낭비. 사전박제가 본질 |
+
+> **INV 9 — PRE_WRITE_GUARD 본질**
+> ②-PRE 5종 활성화 후 ② 진입. 메커니즘: 사후교정 ✗·사전생성 ○. 자가검사 (편집 직전): "이 5종을 *지금* 적용하고 작성하나, 작성 후 적용하나?" 후자 = FAIL → ② 재진입.
 
 ---
 
@@ -111,19 +116,37 @@ references/, scripts/ 등 하위폴더 모두. chmod 필수(원본 read-only →
 
 ---
 
+## ②-PRE 사전 작성 가드 (v1.5, INV 9) — 사전가드·작성가드
+
+② 편집 *진입 전* 5종 룰 활성화. 작성 단계 자체에 박제 = **사전가드 = 작성가드** = PRE_WRITE_GUARD. **신규·중간 경로 강제. 경미는 ①·②만 적용.**
+
+| # | 룰 | 사전 강제 (작성 전 답해야 ② 진입) | 사후 발견 시 |
+|---|---|---|---|
+| 1 | **본질 질문** | "이 스킬이 왜 필요한가? 기존 스킬로 안 되나? NOT 영토 어디?" | ② 재진입 |
+| 2 | **형식 슬롯** | description에 P1·P2·P3·P5·NOT 사전 슬롯 박제. 작성 중 슬롯 채우기 | ② 재진입 |
+| 3 | **트리거 티어** | P1 5+개·P2 한+영 2+개·P3 2+개·P5 1+개·NOT 필수 사전 결정 | ② 재진입 |
+| 4 | **단일 책임** | NOT 라우팅 명시. 인접 스킬과 영토 분리. 중복 ✗ | ② 재진입 |
+| 5 | **WRONG/CORRECT** | ❌WRONG/✅CORRECT 대조 1쌍 사전 강제 (Gotchas 또는 본문) | ② 재진입 |
+
+**메커니즘:** 5종 답을 *먼저* 확정 → 그 답으로 SKILL.md 작성. "쓰고 나서 채운다" = FAIL. paper-engine v3.1 §B-PRE와 동일 패턴.
+
+**경미 편집 면제:** 수정 개소 ≤3 + 구조 동일 = 본 가드 스킵. 단 description 수정은 ①·②만으로도 통과.
+
+**자가검사 (② 진입 직전):** "이 5종을 *지금* 적용하고 작성하나, 작성 후 적용하나?" 후자 = FAIL → ② 재진입.
+
+---
+
 ## ② 편집
 
 | 경로 | 할 일 | 도구 | 다음 |
 |------|-------|------|------|
 | 경미 | 해당 부분만 수정. description 변경 필요 시 같은 턴에 갱신 | Cowork Edit | validate.py만. 성능게이트 스킵 → ③ |
-| 중간 | 구조 변경 + description 갱신 | Cowork Edit/Write | ②-b |
-| 신규 | 의도→트리거→작성. `→ references/new-skill-template.md`, `→ references/trigger-guide.md` | Cowork Write | ②-b |
+| 중간 | ②-PRE 5종 통과 후 구조 변경 + description 갱신 | Cowork Edit/Write | ②-b |
+| 신규 | ②-PRE 5종 통과 후 의도→트리거→작성. `→ references/new-skill-template.md`, `→ references/trigger-guide.md` | Cowork Write | ②-b |
 
 편집 대상: 세션(`/sessions/{session-id}/{skill}/`).
 
 ---
-
-## ②-b 검증 + 성능 게이트 (중간·신규)
 
 **검증:**
 ```bash
@@ -208,3 +231,5 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 | 리서치 자료를 세션·`mnt/outputs/`에 저장 | 세션 종료 시 전량 소실. 규칙 #7 위반 = FAIL. 반드시 VAULT로. 볼트 미마운트 시 request_cowork_directory 선행 |
 | VAULT 마운트 허락 없이 WebSearch 결과를 스킬 본문에 직접 붙여넣기 | 원본 소실·출처 단절. 볼트 저장 후 포인터로 연결 |
 | 산출물 스킬에 NO_WORK_LABEL 블록 미주입·요약·변형 | 작업 라벨 누출 = 외부 독자 차단. verbatim 삽입 강제, 변형 시 ②-b에서 차단 |
+| **사후교정 의존 (작성 후 ②-b에서 룰 적용)** | INV 9 위반. ②-PRE 5종을 *작성 전* 활성화. ②-b는 안전망 1회. 사후 적발 시 ② 재진입 |
+| ②-PRE 5종 일부 스킵 ("쓰고 나서 채울게") | 사전생성형 본질 위배 → 70% 쓰레기 잔존. 5종 답 확정 후 ② 진입 |
