@@ -1,10 +1,10 @@
 ---
 name: skill-builder
-version: 1.5.0
+version: 1.7.0
 license: Proprietary. LICENSE.txt has complete terms
 description: |
-  스킬 수정·생성·패키징 **게이트키퍼** — mnt/.claude/skills/ 수정·생성 전 Skill tool 발동. **v1.5: PRE_WRITE_GUARD 사전생성형 전환** — ② 편집 *진입 전* 5종 룰 강제(본질질문·형식슬롯·트리거티어·단일책임·WRONG-CORRECT). 사후교정 → 사전생성. ②-b는 안전망 1회. **리서치스킬 강제발동 + 리서치 VAULT 저장 강제**.
-  P1: SKILL.md, 스킬수정, 스킬생성, 스킬업데이트, 스킬개선, 스킬패키징, 스킬검증, 트리거수정, 게이트키퍼, 리서치스킬, 리서치기반스킬, 사전가드, 작성가드, PRE_WRITE_GUARD.
+  스킬 수정·생성·패키징 **게이트키퍼** — mnt/.claude/skills/ 수정·생성 전 Skill tool 발동. **v1.7: Single-Confirm-Gate** — 컨펌게이트 3개→1개 통합(② 편집 후 dry-run 산출물 보고 1회). git push는 제안 1줄(게이트 ✗). **v1.6 Tool-Reach-Aware 보존**: 편집 도구 결정표·PREFLIGHT 도달성 체크·bash+python3 디폴트. **v1.5 사전생성형(PRE_WRITE_GUARD) 보존**: ② 편집 *진입 전* 5종 룰 강제. **리서치스킬 강제발동 + 리서치 VAULT 저장 강제**.
+  P1: SKILL.md, 스킬수정, 스킬생성, 스킬업데이트, 스킬개선, 스킬패키징, 스킬검증, 트리거수정, 게이트키퍼, 리서치스킬, 리서치기반스킬, 사전가드, 작성가드, PRE_WRITE_GUARD, 도구도달성, 편집도구결정표, bash-python3편집, 단계컨펌게이트, batch dict패턴.
   P2: 만들어줘, 수정해줘, 고쳐줘, 바꿔줘, 업데이트, create, fix, update.
   P3: skill creation, skill modification, research-backed skill, pre-write guard.
   P4: SKILL.md·references/·scripts/ 편집, {스킬명}+수정동사, autoloop 완료.
@@ -16,9 +16,11 @@ vault_dependency: HARD  # 미마운트=STOP+보고. fallback 없음(SKILL 원본
 # Skill Builder
 
 스킬 생성·수정·스킬패키징·스킬검증 1턴 게이트키퍼. 선형 흐름 — 분기 최소, 루프 0.
-**v1.5 사전생성형:** 작성 단계 *자체*에 룰 강제 적용. ②-b는 안전망 1회로 격하. 사후교정 의존 ✗.
+**v1.7 Single-Confirm-Gate:** 컨펌게이트 3개→1개 통합. ② 편집 후 dry-run 산출물(diff·판정·EDIT_MODE)을 1번에 보고 → 컨펌 → ③ 패키징. git push는 제안 1줄(게이트 ✗).
+**v1.6 Tool-Reach-Aware 보존:** 편집 도구 결정표·PREFLIGHT 도달성·bash+python3 디폴트.
+**v1.5 사전생성형 보존:** ② 편집 *진입 전* 5종 룰 강제. ②-b는 안전망 1회. 사후교정 의존 ✗.
 
-**흐름:** 🚦 PREFLIGHT → ⓘ 리서치필요 판정 → ① 읽기+판정 → [진단이면 종료] → **②-PRE PRE_WRITE_GUARD (5종 활성화)** → ② 편집 [룰 강제된 상태로 작성] → ②-b 안전망 검증 → ③ 패키징+제공
+**흐름:** 🚦 PREFLIGHT(+도달성) → ⓘ 리서치필요 판정 → 🅐 AskUserQuestion (불명확 시만) → ① 읽기+판정 → [진단이면 종료] → **②-PRE PRE_WRITE_GUARD (5종 활성화)** → ② 편집 [룰 강제된 상태로 작성] → ②-b 안전망 검증 → **🚦 단일 컨펌게이트 (편집 후 dry-run 산출물 보고)** → ③ 패키징+제공 → git push 제안 1줄(옵션)
 
 ---
 
@@ -29,6 +31,17 @@ vault_dependency: HARD  # 미마운트=STOP+보고. fallback 없음(SKILL 원본
 | 1 | **게이트키퍼** — `mnt/.claude/skills/` 하위 **어떤 파일이든**(SKILL.md·references/·scripts/·assets/) 수정·생성·삭제·이름변경 전 **반드시 `Skill tool`로 skill-builder 발동**. 도구 무관(Edit/Write/Bash mv/Bash rm). **감지:** ①경로가 `mnt/.claude/skills/` 하위 ②대화에 스킬명+수정동사 ③"스킬 수정/고쳐/바꿔/업데이트" 언급 ④진단→수정 전환 ⑤EDIT4 직행 ⑥**리서치 필요 스킬 생성·수정** (도메인지식·사례·레퍼런스·벤치마킹 수집 선행) — 하나라도 걸리면 Skill tool 호출 먼저 | description이 발동 판단 유일 입력. 미발동 = 버전 꼬임·검증 누락·리서치 결과 세션 소실 |
 | 2 | **수정 완료 = .skill 패키징 제공** | 사용자가 설치할 수 없음 |
 | 3 | **세션 내 직접 편집** — 원본→세션 복사 → Cowork Edit/Write → zip → present. FS MCP는 plugin_skills_path 반영 시에만 | 세션 도구가 최단 경로. WORKBENCH 경유 = 이원화 병목 |
+**📋 편집 도구 결정표 (v1.6 신설 — 매 편집 진입 전 1초 결정):** _도구도달성·편집도구결정표·bash-python3편집·단계컨펌게이트_
+
+| 환경 | 대상 경로 | 편집 도구 | 비고 |
+|------|----------|----------|------|
+| Cowork mode | `mnt/.claude/skills/...` (read-only) | **bash + python3 in-place** | Cowork Edit 사각지대·DC도 VM 격리로 못 닿음. 디폴트 |
+| Cowork mode | 형 컨넥티드 폴더 (예: VAULT) | **Cowork Edit/Write** | 정상 도달 |
+| 호스트 마운트 | `/var/folders/...` (Mac 호스트) | **DC edit_block** | host fs 직접 |
+| 세션 디렉터리 | `/sessions/{id}/{skill}/` (세션 복사본) | **bash + python3 in-place** | VM 안. Cowork Edit/DC 모두 못 닿음 |
+
+**룰:** PREFLIGHT 도달성 체크에서 EDIT_MODE 출력 → 그 모드만 사용. 4번 갈아타기 = FAIL.
+
 | 4 | **루프 하드캡** — 재시도·검증 순회 **max 2회**. 초과 → 보고 + STOP | 무한 루프 방지 |
 | 5 | **원본 유일 = skills-plugin** — 매번 원본에서 새로. **예외: autoloop handoff** — 세션에 `handoff.json` 존재 시 오토루프 실험장을 원본으로 사용 | 버전 꼬임 방지. handoff는 오토루프 검증 완료 상태 |
 | 6 | **PREFLIGHT 선행** — 착수 전 단일 Bash 1회로 경로·권한·출력경로 3체크 + 세션 복사본 Read 1회. 미수행 시 ① 진입 = FAIL | EROFS·Read 누락·출력경로 미존재 연쇄 실패 1턴 차단 |
@@ -46,7 +59,8 @@ vault_dependency: HARD  # 미마운트=STOP+보고. fallback 없음(SKILL 원본
 ```bash
 echo "=== ① ORIGIN 경로·권한 ===" && ls -la mnt/.claude/skills/{skill}/SKILL.md 2>&1 | head -5 && \
 echo "=== ② SKILL.md 개수 ===" && find mnt/.claude/skills/{skill}/ -name "SKILL.md" | wc -l && \
-echo "=== ③ 출력 경로 ===" && ls -d mnt/*/ 2>&1 | grep -v uploads | grep -v .claude
+echo "=== ③ 출력 경로 ===" && ls -d mnt/*/ 2>&1 | grep -v uploads | grep -v .claude && \
+echo "=== ④ EDIT_MODE 도달성 ===" && [ -w mnt/.claude/skills/{skill}/SKILL.md ] && echo "EDIT_MODE=cowork-edit" || echo "EDIT_MODE=bash-python3 (read-only/non-connected)"
 ```
 
 | 체크 | 기준 | 실패 시 |
@@ -54,6 +68,7 @@ echo "=== ③ 출력 경로 ===" && ls -d mnt/*/ 2>&1 | grep -v uploads | grep -
 | ① 경로·권한 | ORIGIN SKILL.md 존재·가독 | STOP + 스킬명 확인 요청 |
 | ② SKILL.md 1개 | `wc -l` = 1 | STOP (2개+ 시 zip 충돌) |
 | ③ 출력 경로 | 마운트 폴더 1개+ | 스크래치패드로 전환 |
+| ④ EDIT_MODE | `cowork-edit` 또는 `bash-python3` 1개 출력 | 결정표 따라 그 도구만 사용. 다른 도구 시도 = FAIL·재진입 |
 
 **Read-before-Edit 의무:** 세션 복사본을 Cowork Read로 1회 이상 읽고 Edit 착수. `cp + chmod`만으론 Cowork 파일추적 갱신 안 됨 → `File has not been read yet` 에러.
 
@@ -88,6 +103,19 @@ echo "=== ③ 출력 경로 ===" && ls -d mnt/*/ 2>&1 | grep -v uploads | grep -
 
 ---
 
+## 🅐 AskUserQuestion (불명확 시만 — F2·F3 차용)
+
+**조건:** PREFLIGHT 통과 후 다음 중 하나라도 모호:
+- 스킬명 다중 후보 (formatter·formatter-skill·format-engine 등)
+- "수정" 동사 모호 (트리거? description? 본문? 전부?)
+- 신규 vs 수정 vs 진단 경계 모호
+
+**Skip:** 형이 첫 메시지에 스킬명 + 수정 범위 + 동사 다 줬으면 직행. AskUserQuestion 호출 ✗·자유서술 ✗.
+
+**호출 시:** AskUserQuestion 1회·options 명시 (자유서술 자동 포함). 답 받고 ① 진입.
+
+---
+
 ## ① 읽기 + 경로 판정
 
 **0. 핸드오프 감지 (최우선):** 세션에 `autoloop-lab/{skill-name}/handoff.json` 존재?
@@ -112,7 +140,17 @@ references/, scripts/ 등 하위폴더 모두. chmod 필수(원본 read-only →
 | 중간 | 섹션 신설·삭제·재배치, 로직 변경 (스킬개선) | ② 중간 |
 | 신규 | 처음부터 (스킬생성) | ② 신규 → `→ references/new-skill-template.md 참조` |
 
-**N개 동시 처리:** 독립 스킬이면 복사+Read+validate를 병렬 tool call.
+**N개 동시 처리:** 독립 스킬이면 복사+Read+validate를 병렬 tool call. **batch 모드 = 단일 python3 1회로 N개 SKILL.md 동시 replace** (`→ references/bash-python3-edit-template.md` 참조).
+
+---
+
+## 🪧 판정 보고 (silent·1줄·게이트 ✗)
+
+판정 직후 1줄 silent 보고 후 ②-PRE 직행. 컨펌 대기 ✗.
+
+형식: `경로:{경미|중간|신규|진단} · EDIT_MODE:{bash-python3|cowork-edit|DC} · 예상갭:{N곳}`
+
+**진단 경로:** 보고만 하고 종료.
 
 ---
 
@@ -167,6 +205,25 @@ cd /sessions/{session-id} && python scripts/validate.py ./{skill}/
 
 ---
 
+## 🚦 단일 컨펌게이트 — 편집 후 dry-run 산출물 보고 (v1.7·F8 차용)
+
+② 편집 + ②-b 통과 직후. 유일한 컨펌게이트. trigger-skill v5.6 dry-run 본질 = 실측 산출물 1회 보고 → 컨펌 → 패키징.
+
+```
+경로: {경미|중간|신규} · EDIT_MODE: {bash-python3|cowork-edit|DC}
+변경 슬롯 N개:
+- 슬롯 A: {Before 1줄} → {After 1줄}
+- 슬롯 B: ...
+검증: validate.py errors=[]
+→ 패키징 진행할까?
+```
+
+**Skip 조건:** 형이 사전에 "끝까지 가" 명시 = Skip. 디폴트 = 컨펌 대기. 경미 편집 + 단일 슬롯 = 자동 Skip 가능.
+
+**적발 시 ② 재진입:** 형이 "X도 추가" 등 수정사항 주면 ②로 복귀. 루프 max 2회.
+
+---
+
 ## ③ 패키징 + 제공
 
 상세: `→ references/packaging-guide.md`
@@ -181,11 +238,22 @@ cd /sessions/{session-id} && python scripts/validate.py ./{skill}/
 | ③-d | `ls mnt/outputs/{skill}*.skill` = 1개·접미사 없음 |
 
 **절대:** `-1`·`_copy` 접미사 = FAIL → ③-a 재실행. 루프 하드캡 2회.
-**패키징 완료 후:** "git push 할까요?" 1줄 제안 → 컨펌 시 git-sync 발동.
+**📌 패키징 완료 후 제안 (v1.7·게이트 ✗):** "git push 할까?" 1줄 옵션 제안. 형 답 없으면 발동 ✗·기다리지 않음. 게이트 아님.
 
 ---
 
 ## 신규생성 요약
+
+**Start small (F10 차용):** 최소 컴포넌트로 시작. 한 스킬에 한 책임. references·scripts·assets는 필요할 때만.
+
+**컴포넌트 플랜 표 (F4 차용·신규생성 시 컨펌게이트 1에서 출력):**
+
+| 구성 | 만들/안 만들 | 이유 |
+|------|------------|------|
+| SKILL.md | 만든다 | 필수 |
+| references/ | {O|X} | 도메인 지식·예시 필요 시 |
+| scripts/ | {O|X} | 결정적·반복 작업 코드화 시 |
+| assets/ | {O|X} | 출력 템플릿 필요 시 |
 
 허브스포크: `→ references/hub-spoke-guide.md`
 스켈레톤: `→ references/new-skill-template.md`
@@ -205,11 +273,33 @@ skill-name/
 
 ---
 
-## 배치 모드
+## 배치 모드 (v1.6 구체화·N4)
 
-2개+ 스킬 동시 요청 시: 같은 단계끼리 묶어 병렬 발행.
-```
-Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
+2개+ 스킬 동시 요청 시 = **단일 python3 1회 dict 처리**.
+
+**원칙:** Read N개 병렬 → bash 1회로 dict {skill_name: [(old, new), ...]} 처리 → zip N개 병렬 → present_files 1회.
+
+**금지:** 스킬마다 bash 따로·Edit 따로 = 4번 갈아타기 N배. 자동 FAIL.
+
+**풀템플릿:** `→ references/bash-python3-edit-template.md`
+
+```bash
+# 단일 turn 패턴
+cd /sessions/{id} && python3 - << 'INNER'
+edits = {
+  "skill-A": [("old1", "new1"), ("old2", "new2")],
+  "skill-B": [("oldX", "newY")],
+}
+for skill, pairs in edits.items():
+    p = f"{skill}/SKILL.md"
+    s = open(p).read()
+    for o, n in pairs:
+        assert o in s, f"{skill}: missing {o[:40]}"
+        s = s.replace(o, n, 1)
+    open(p, "w").write(s)
+INNER
+# 그 다음 zip 병렬
+for sk in skill-A skill-B; do (cd /sessions/{id} && zip -r "$sk.skill" "$sk/" -x "*.pyc" "__pycache__/*" ".DS_Store") & done; wait
 ```
 
 ---
@@ -219,6 +309,7 @@ Read(A)+Read(B) → Edit(A)+Edit(B) → zip A & zip B & wait → present_files
 | 함정 | 대응 |
 |------|------|
 | `mnt/.claude/skills/` 직접 쓰기 | 읽기전용. 세션 복사 후 편집 → .skill 설치로만 반영 |
+| Cowork Edit이 `mnt/.claude/skills/` 못 닿음 (v1.6 새 함정) | EDIT_MODE=bash-python3 강제. 결정표 참조. 4번 갈아타기 = FAIL |
 | `/tmp/` 경로 | Read/Edit 접근 불가. 세션 디렉토리만 |
 | WORKBENCH(`_skills workspace/`) 경유 | 불필요. FS MCP vs Cowork 경로 이원화로 병목 |
 | description↔본문 불일치 | description이 발동 판단 유일 입력. 수정 시 본문 동기 확인 |
