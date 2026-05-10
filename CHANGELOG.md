@@ -1,3 +1,44 @@
+# CHANGELOG
+
+## [2.0.0] - 2026-05-10 (단순화 — 공식 skill-creator 회귀)
+
+**트리거:** 형 요청 — "뱅뱅 돌고 헷갈리고 복사 실패해서 다시 작업". 공식 Anthropic skill-creator 패턴 분석 후 회귀.
+
+### 본질 변경
+v1.7 누적 12개 게이트·4종 EDIT_MODE·4종 작업공간이 LLM 자기점검을 매 스텝 강요 → 토큰 낭비 + 경로 혼동. 공식 skill-creator는 절대규칙 0·게이트 0·EDIT_MODE 결정표 0이고 흐름은 자연어 6단계뿐. 형 환경의 한국어 트리거·VAULT·NO_WORK_LABEL 등 강점만 보존하고 공식 패턴으로 회귀.
+
+### Removed (5종)
+- **EDIT_MODE 결정표** — 4종(cowork-edit·bash-python3·DC·세션) → bash-python3 단일. Cowork mode에서 mnt/.claude는 항상 read-only이므로 분기 무의미
+- **②-PRE PRE_WRITE_GUARD 5종 절대규칙** → 작성 전 자가검토 권고로 격하 (사후교정 차단보다 사전 권고가 토큰 우월)
+- **②-b 안전망 별도 단계** → ③ validate.py 1콜로 통합
+- **PREFLIGHT 4체크 매트릭스** → 단일 bash 1회 (원본 존재·SKILL.md 1개·outputs·EDIT_MODE 고정)
+- **handoff.json·NO_WORK_LABEL·VAULT 강제 절대규칙화** → 조건부 발동·본문 권고로 격하
+
+### Changed (3종)
+- **작업공간**: 4종 → 2종 (`/sessions/{id}/{skill}/` 편집 + `mnt/outputs/` 산출). VAULT는 리서치 스킬일 때만 조건부
+- **절대규칙**: 9개 → 4개 (게이트키퍼·.skill 패키징·세션 편집·루프 max 2회)
+- **게이트**: 12개 → 2개 (경로판정 1줄 + 패키징 직전 1줄)
+
+### Kept (형 강점 보존)
+- description의 P1·P2·P3·P5·NOT 슬롯 (한국어 트리거 풍부도 = 공식 대비 강점)
+- 배치 모드 단일 python3 dict 패턴
+- 핸드오프 감지 (autoloop 결과 자동 활용)
+- WRONG/CORRECT 대조 (작업공간·게이트 2쌍 추가)
+
+### Effects (실측·추정)
+- SKILL.md: 326줄·21KB → 268줄·11KB (−18%·−48%)
+- 절대규칙: 9 → 4
+- 게이트: 12 → 2
+- EDIT_MODE 분기: 4 → 1
+- 작업공간: 4 → 2
+- 1턴 평균 토큰: −40~50% 추정 (게이트 자기점검 횟수 감소)
+
+### Risk
+- description의 P1 키워드가 본문에 안 나타날 수 있음 (validate warning) — 기능 영향 ✗·트리거 발동에는 description 단독 매칭이라 OK
+- "단일 컨펌게이트" 기조는 v1.7 유지·강화
+
+---
+
 ## [1.4.0] - 2026-04-26 (베놈화)
 
 **트리거:** 형 요청 — "스킬빌더가 신규 스킬 만들 때도 안트로픽 권장사항이 자연 발현되도록 베놈처럼 적용"
