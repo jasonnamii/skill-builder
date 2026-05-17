@@ -26,12 +26,19 @@ def main(skill_dir):
 
     s = open(skill_md).read()
 
-    # 1. description 추출
-    m = re.search(r"^description: (.+)$", s, re.MULTILINE)
-    if not m:
-        fails.append("description frontmatter 없음")
+    # 1. description 추출 (1줄 또는 멀티라인 | 블록)
+    fm_match = re.search(r"^---\n(.*?)\n---", s, re.DOTALL)
+    fm = fm_match.group(1) if fm_match else s
+    m_single = re.search(r"^description:\s*([^|\n].+)$", fm, re.MULTILINE)
+    m_multi = re.search(r"^description:\s*\|\s*\n((?:  .+\n?)+)", fm, re.MULTILINE)
+    if m_multi:
+        desc = m_multi.group(1).strip()
+    elif m_single:
+        desc = m_single.group(1).strip()
     else:
-        desc = m.group(1)
+        fails.append("description frontmatter 없음")
+        desc = ""
+    if desc:
         if len(desc) > 1024:
             fails.append(f"description {len(desc)}/1024 초과")
         if "NOT" not in desc and "→" not in desc:
