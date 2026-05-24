@@ -1,14 +1,16 @@
 ---
 name: skill-builder
-description: 스킬 생성·수정·패키징·검증 1턴 완결 게이트키퍼. v3.1 9룰 베놈 — Prereq·NextPhase·OutputPath·RefIndex·Boundaries·WhenToUse·FailureModes 강제 + metadata 표준화. mnt/.claude/skills 편집 직전 강제 발동. P1 스킬빌더, skill builder, skill creator, SKILL.md, 스킬생성, 스킬수정, 스킬패키징, 스킬검증, 트리거수정, 게이트키퍼, 9룰베놈. P2 만들어줘, 수정해줘, 고쳐줘, 바꿔줘, create, fix, update. P3 skill creation, skill modification, skill packaging, 9-rule discipline. P4 SKILL.md·references·scripts 편집·{스킬명}+수정동사·autoloop 완료. P5 .skill로. NOT 프롬프트엔지니어링(→직접), 플러그인(→create-cowork-plugin), 최적화루프(→autoloop), UP수정(→up-manager).
+description: 스킬 생성·수정·패키징·검증 1턴 완결 게이트키퍼. v3.1 9룰 베놈 — Prereq·NextPhase·OutputPath·RefIndex·Boundaries·WhenToUse·FailureModes 강제 + metadata 표준화. mnt/.claude/skills 편집 직전 강제 발동. P1 스킬빌더, skill builder, skill creator, SKILL.md, 스킬생성, 스킬수정, 스킬패키징, 스킬검증, 트리거수정, 게이트키퍼, 9룰베놈. P2 만들어줘, 수정해줘, 고쳐줘, 바꿔줘, create, fix, update. P3 skill creation, skill modification, skill packaging, 9-rule discipline. P4 SKILL.md·references·scripts 편집·{스킬명}+수정동사·autoloop 완료. P5 .skill로. NOT 프롬프트엔지니어링(→직접), 플러그인(→cowork-plugin-management:create-cowork-plugin), 최적화루프(→autoloop), UP수정(→up-manager).
 metadata:
   author: jason
   version: "3.1.0"
 ---
 
-# skill-builder v3.1
+# skill-builder v3.2
 
 **1턴 완결.** ① 복사 → ② 묶음편집·검증 → ③ Dry-run → ④ 패키징·Host sync.
+
+**v3.2 안티-뱅뱅 (2026-05-24):** v3.1 베놈 위에 4대 RCA 패치 — ① heredoc 실패 진단 표준 ② host/VM 경로 진실 매핑 ③ 성능 패치 시 캐시 무효화 강제 ④ sync 스크립트 환경 의존 명시. 상세 → `references/anti-bangbang.md`.
 
 **v3.1 베놈:** 모든 신규·수정 스킬에 **9룰 강제 적용**. SKILL.md 골격에 Prereq·NextPhase·OutputPath·RefIndex·Boundaries·WhenToUse·FailureModes 7섹션 강제 + metadata 표준화 + description 첫문장 평문화 권고.
 
@@ -45,6 +47,7 @@ metadata:
 | 3 | **편집은 VM `/sessions/$SESSION_ID/$SKILL/`** — host 원본 read-only |
 | 4 | **루프 max 2회** — 검증 실패 1회 재시도, 2회차 = STOP |
 | 5 | **9룰 베놈 강제** — 신규 스킬은 7섹션(Boundaries·WhenToUse·Prereq·OutputPath·RefIndex·NextPhase·FailureModes) 골격 자동 삽입. 수정 모드는 누락 룰 보강. 미적용 = FAIL |
+| 6 | **안티-뱅뱅 (v3.2)** — heredoc 안 `applied/skipped` 리스트 + `AssertionError` 메시지에 실패 패치 태그·snippet 강제. host경로는 `mnt/outputs/` 경유. 성능 패치는 캐시 rm 후 측정. sync는 git-sync 스킬 위임 |
 
 ## ① 복사
 
@@ -90,9 +93,15 @@ required = ["Skill Boundaries", "When to Use", "Prerequisites", "Output", "Refer
 missing = [r for r in required if not re.search(r, s)]
 assert not missing, f"9룰 누락: {missing}"
 
-print(f"edits={len(edits)} desc={desc_len}/1024 9rules=OK")
+# v3.2 안티-뱅뱅: applied/skipped 리스트 강제 (진단 콜 0회)
+print(f"applied={[o[:30] for o,_ in edits]} desc={desc_len}/1024 9rules=OK")
 EOF
 ```
+
+**v3.2 진단 출력 룰 (필수):**
+- 편집 루프 안 `if old in s` 가드 → 실패 시 `raise AssertionError(f"FAILED at: {tag}")` (어느 패치 단계인지 즉시 식별)
+- heredoc 끝 `print(f"applied={[...]} skipped={[...]} len={len(s)}")` 강제
+- 효과: 형이 "뭐 들어갔어/안 들어갔어?" 진단 콜 0회. 상세 → `references/anti-bangbang.md`.
 
 **전면 재작성:** 단일 `python3` heredoc 안에서 `open(p,"w").write(new_content)` + 동일 heredoc에 검증.
 
@@ -117,13 +126,36 @@ python3 skill-builder/scripts/dry_run.py ./$SKILL/
 ## ④ 패키징 + Host sync
 
 ```bash
-SESSION_ID=sleepy-charming-cray; SKILL=skill-name
+SESSION_ID=magical-festive-keller; SKILL=skill-name
 cd /sessions/$SESSION_ID && \
 rm -f $SKILL.skill && \
 zip -qr $SKILL.skill $SKILL/ -x "*.pyc" "__pycache__/*" ".DS_Store" "evals/*" && \
 cp $SKILL.skill mnt/outputs/$SKILL.skill && \
-bash skill-builder/scripts/sync-to-host-plugin.sh $SKILL && \
 ls -la mnt/outputs/$SKILL.skill
+```
+
+**Host sync 정책 (v3.2 명시):**
+- `sync-to-host-plugin.sh`는 **host shell 전용·git-sync env 의존**. VM bash에서 호출 ✗
+- skill-builder ④ = `mnt/outputs/{SKILL}.skill` 출고만 강제. host plugin 동기는 git-sync 스킬에 위임
+- 형이 명시 요청 시에만 git-sync 호출
+
+### v3.2 경로 진실 매핑 (뱅뱅이 차단 핵심)
+
+| 경로 | VM bash(workspace) | host bash(DC) |
+|---|---|---|
+| `/sessions/{id}/...` | ✅ R/W | ❌ |
+| `/Users/jason/...` | ❌ | ✅ R/W |
+| `mnt/outputs/` ↔ `~/Library/.../local_*/outputs/` | 양쪽 동일 | 양쪽 동일 |
+| `mnt/.claude/skills/{X}/` | Read-only | ❌ |
+| `~/github-repos/.../scripts/` | ❌ | ✅ R/W |
+
+**VM→Host 파일 전달 패턴:**
+1. VM bash: `cp /sessions/.../patched mnt/outputs/`
+2. DC bash: `cp "$HOST_OUTPUTS/patched" ~/github-repos/.../target`
+
+DC outputs 절대경로:
+```bash
+OUT=$(ls -td "$HOME/Library/Application Support/Claude/local-agent-mode-sessions"/*/*/local_*/outputs | head -1)
 ```
 
 **제공:** `[다운로드](computer://...)` 1줄. **git push 제안:** 옵션·답 없으면 ✗.
@@ -147,6 +179,7 @@ references/ 폴더의 어떤 파일을 언제 읽는지.
 | `references/new-skill-template.md` | 신규 스킬 골격 (9룰 포함) | 신규 생성 시 |
 | `references/trigger-guide.md` | description 트리거 작성법 (P1~NOT) | description 작성·수정 시 |
 | `references/9-rules-template.md` | 7섹션 골격 스니펫 | 베놈 모드 (9룰 보강) |
+| `references/anti-bangbang.md` | 뱅뱅이 4대 RCA + 진단 출력 패턴 (v3.2) | 묶음 heredoc 작성·성능 패치·VM↔Host 전달 시 |
 
 ## 신규생성 (9룰 베놈 골격 자동 삽입)
 
@@ -215,6 +248,11 @@ done; wait
 | **9룰 7섹션 누락한 채 패키징** | 절대규칙 5 위반. 7섹션 grep PASS 후 진행 |
 | **신규 스킬에 Boundaries·WhenToUse 누락** | 트리거 충돌 시 디스앰비게이트 불가. 골격 강제 삽입 |
 | **Prerequisites 누락한 채 시작** | 의존 파일 없을 때 침묵 실패. 본문 상단에 체크 표 |
+| **(v3.2) 묶음 heredoc 실패 시 진단 콜 폭증** | assert에 실패 태그·snippet 강제. heredoc 끝 `applied/skipped` 출력 강제. 형 진단 콜 0회 |
+| **(v3.2) VM↔Host 경로 혼동으로 cp 실패** | §④ 경로 진실 매핑 표 참조. VM `/sessions/`는 DC에서 ✗. host `/Users/`는 VM에서 ✗. `mnt/outputs/` ↔ `~/Library/.../outputs/`만 양쪽 동일 |
+| **(v3.2) 성능 패치 dry-run PASS인데 실측 0초 컷** | 대상 스크립트에 sha256·캐시 short-circuit이 있으면 `.cache/` rm 후 재측정 강제 |
+| **(v3.2) sync-to-host-plugin.sh를 VM에서 호출** | host shell·git-sync env 전용. VM에서 호출 = 부재 exit. ④에서 호출 ✗. git-sync 스킬이 별도 사용 |
+| **(v3.2) 디스크 풀로 파일 truncated** | `df -h /sessions` 확인. 부족 시 `/sessions/$SID/{skill명}` 작업본·`.skill` zip 정리. 작성 직후 `wc -c` 검증 |
 
 ## ❌ WRONG vs ✅ CORRECT
 
@@ -225,5 +263,20 @@ done; wait
 
 ```
 ❌ WRONG: 수정 후 패키징만 하고 host plugin sync 누락 → git-sync "변경 없음"
-✅ CORRECT: `sync-to-host-plugin.sh` 강제 호출 후 outputs+host 둘 다 갱신 확인
+✅ CORRECT: 형 명시 요청 시 git-sync 스킬 별도 호출 (skill-builder ④는 outputs 출고만)
+```
+
+```
+❌ WRONG (v3.2 안티-뱅뱅): 묶음 heredoc 실패 후 "어디까지 들어갔지?" 진단 콜 3회 (sed/grep/find 따로)
+✅ CORRECT: assert에 실패 태그 + heredoc 끝 `applied/skipped` 출력 → 1콜로 진단 완료
+```
+
+```
+❌ WRONG: 성능 패치 후 dry-run PASS만 보고 출고 → 실측 sha256 short-circuit으로 0초 컷
+✅ CORRECT: 캐시 식별 → `rm .cache/...` → 실측 → before/after 시간 명시
+```
+
+```
+❌ WRONG: VM에서 `cp /sessions/... ~/github-repos/...` → "No such file"
+✅ CORRECT: VM `cp /sessions/... mnt/outputs/...` → DC `cp "$OUT/..." ~/github-repos/...`
 ```
