@@ -1,5 +1,6 @@
 ---
 name: skill-builder
+version: 5.0
 description: 스킬을 생성·수정·검증·패키징하는 1턴 완결 게이트키퍼. 호스트 캐시 직접 편집·VM/호스트 이중환경 분기·N사본 동기·9룰 베놈 강제·.skill 패키징을 한 흐름으로 처리한다.
   P1 스킬빌더, skill builder, skill creator, SKILL.md, 스킬생성, 스킬수정, 스킬패키징, 스킬검증, 트리거수정, 게이트키퍼, 9룰베놈, 캐시직접편집, N사본동기, VM호스트분기, 이중환경, bindfs우회.
   P2 만들어줘, 수정해줘, 고쳐줘, 바꿔줘, 패키징해줘, 제공해줘, 줘, 달라, create, fix, update, package.
